@@ -54,7 +54,8 @@ async function getTrackArtists(track) {
 function emojiToCountryCode(emoji) {
   return Array.from(emoji)
     .map((c) => String.fromCharCode(c.codePointAt(0) - 127397))
-    .join("").toLowerCase();
+    .join("")
+    .toLowerCase();
 }
 
 function flagImg(emoji, width, height, marginLeft) {
@@ -149,30 +150,31 @@ function main() {
       Spicetify.Player.next();
     }
 
-    const parentSpans = document.querySelectorAll(
-      "div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
-    );
-
-    const links = new Map(
-      Array.from(parentSpans).flatMap((span) =>
-        Array.from(span.querySelectorAll("a")).map((a) => {
-          const id = a.href.split("/").pop();
-
-          const artist = trackArtists.find((art) => art.url === id);
-
-          if (artist?.name) {
-            const innerSpan = a.closest("span");
-
-            artist.countries.forEach((ct) => {
-              const img = flagImg(ct.emoji, 16, 12, 4);
-              innerSpan.appendChild(img);
-            });
-          }
-
-          return [id, a];
-        }),
+    const allArtistSpans = [
+      document.querySelector(
+        "div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
       ),
-    );
+      document.querySelector(
+        "div.Root__right-sidebar div.main-nowPlayingView-nowPlayingWidget div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
+      ),
+    ];
+
+    allArtistSpans.forEach((span) => {
+      span.querySelectorAll("a").forEach((a) => {
+        const id = a.href.split("/").pop();
+
+        const artist = trackArtists.find((art) => art.url === id);
+        if (!artist?.name) return;
+
+        const innerSpan = a.closest("span");
+        if (!innerSpan) return;
+
+        artist.countries.forEach((ct) => {
+          const img = flagImg(ct.emoji, 16, 12, 4);
+          innerSpan.appendChild(img);
+        });
+      });
+    });
   });
 
   Spicetify.Platform.History.listen(async (location) => {
