@@ -71,7 +71,65 @@ function flagImg(emoji, width, height, marginLeft) {
   return img;
 }
 
+function waitForArtistNameChange(previousName, timeout = 5000) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+
+    const observer = new MutationObserver(() => {
+      const span = document.querySelector(
+        "section span.main-entityHeader-title span",
+      );
+
+      const currentName = span?.textContent?.trim();
+
+      if (currentName && currentName !== previousName) {
+        observer.disconnect();
+        resolve(span);
+      }
+
+      if (Date.now() - start > timeout) {
+        observer.disconnect();
+        resolve(span || null);
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  });
+}
+
+async function loadArtistOrigin(
+  location = Spicetify.Platform.History.location,
+) {
+  const pageType = location.pathname.split("/")[1];
+  const id = location.pathname.split("/")[2];
+  console.log(location.pathname);
+  console.log(pageType + " " + id);
+  if (pageType === "artist") {
+    const oldSpan = document.querySelector(
+      "section span.main-entityHeader-title span",
+    );
+    const oldName = oldSpan?.textContent?.trim();
+    const artistNameSpan = await waitForArtistNameChange(oldName);
+
+    if (!artistNameSpan) return;
+    console.log(artistNameSpan);
+
+    const artist = await fetchArtist(id);
+
+    artist.countries.forEach((ct, i) => {
+      const img = flagImg(ct.emoji, 96, 72, i === 0 ? 25 : 5);
+      artistNameSpan.appendChild(img);
+    });
+  }
+}
+
 function main() {
+  loadArtistOrigin();
+
   Spicetify.Player.addEventListener("songchange", async (event) => {
     const track = Spicetify.Player.data?.item;
     const trackName = track?.name;
@@ -115,6 +173,10 @@ function main() {
         }),
       ),
     );
+  });
+
+  Spicetify.Platform.History.listen(async (location) => {
+    loadArtistOrigin(location);
   });
 }
 
