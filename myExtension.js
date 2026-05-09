@@ -51,6 +51,26 @@ async function getTrackArtists(track) {
   return await Promise.all(trackArtistsUrls.map((el) => fetchArtist(el)));
 }
 
+function emojiToCountryCode(emoji) {
+  return Array.from(emoji)
+    .map((c) => String.fromCharCode(c.codePointAt(0) - 127397))
+    .join("").toLowerCase();
+}
+
+function flagImg(emoji, width, height, marginLeft) {
+  const code = emojiToCountryCode(emoji);
+
+  const img = document.createElement("img");
+  img.src = `https://flagcdn.com/${width}x${height}/${code}.png`;
+  img.alt = code;
+  img.style.marginLeft = `${marginLeft}px`;
+  img.style.verticalAlign = "middle";
+  img.style.width = `${width}px`;
+  img.style.height = `${height}px`;
+
+  return img;
+}
+
 function main() {
   Spicetify.Player.addEventListener("songchange", async (event) => {
     const track = Spicetify.Player.data?.item;
@@ -70,6 +90,31 @@ function main() {
     if (isBlocked) {
       Spicetify.Player.next();
     }
+
+    const parentSpans = document.querySelectorAll(
+      "div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
+    );
+
+    const links = new Map(
+      Array.from(parentSpans).flatMap((span) =>
+        Array.from(span.querySelectorAll("a")).map((a) => {
+          const id = a.href.split("/").pop();
+
+          const artist = trackArtists.find((art) => art.url === id);
+
+          if (artist?.name) {
+            const innerSpan = a.closest("span");
+
+            artist.countries.forEach((ct) => {
+              const img = flagImg(ct.emoji, 16, 12, 4);
+              innerSpan.appendChild(img);
+            });
+          }
+
+          return [id, a];
+        }),
+      ),
+    );
   });
 }
 
