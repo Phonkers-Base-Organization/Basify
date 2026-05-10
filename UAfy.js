@@ -45,6 +45,26 @@ class Country {
   constructor(name, emoji) {
     this.name = name;
     this.emoji = emoji;
+    this.countryCode = this.emojiToCountryCode(emoji);
+  }
+
+  emojiToCountryCode(emoji) {
+    return Array.from(emoji)
+      .map((c) => String.fromCharCode(c.codePointAt(0) - 127397))
+      .join("")
+      .toLowerCase();
+  }
+
+  flagImg(width, height, marginLeft) {
+    const img = document.createElement("img");
+    img.src = `https://flagcdn.com/${width}x${height}/${this.countryCode}.png`;
+    img.alt = this.countryCode;
+    img.style.marginLeft = `${marginLeft}px`;
+    img.style.verticalAlign = "middle";
+    img.style.width = `${width}px`;
+    img.style.height = `${height}px`;
+
+    return img;
   }
 }
 
@@ -56,140 +76,181 @@ class Artist {
     this.labels = labels;
   }
 
-  addCountry(country) {
-    this.countries.push(country);
+  createArtistInfoSection() {
+    const section = document.createElement("div");
+    section.classList.add("uafy-artist-info-section");
+
+    const countriesRow = document.createElement("div");
+    countriesRow.classList.add("uafy-countries-row");
+
+    const badgesRow = document.createElement("div");
+    badgesRow.classList.add("uafy-badges-row");
+
+    Object.assign(section.style, {
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      marginTop: "4px",
+      flexWrap: "nowrap",
+      width: "100%",
+      maxWidth: "100%",
+      overflow: "hidden",
+    });
+
+    [countriesRow, badgesRow].forEach((row) => {
+      Object.assign(row.style, {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        flexWrap: "wrap",
+      });
+    });
+
+    if (this.countries.length) {
+      this.countries.forEach((country) => {
+        countriesRow.appendChild(this.createCountryBadge(country));
+      });
+    } else {
+      countriesRow.appendChild(this.createSimpleTag("Unknown origin"));
+    }
+
+    if (this.labels.length) {
+      this.labels.forEach((label) => {
+        badgesRow.appendChild(this.createTrustBadge(label));
+      });
+    } else {
+      badgesRow.appendChild(this.createTrustBadge("noInfo"));
+    }
+
+    const separator = this.createInfoSeparator();
+
+    section.appendChild(countriesRow);
+    section.appendChild(separator);
+    section.appendChild(badgesRow);
+
+    return section;
   }
 
-  addLabel(label) {
-    this.labels.push(label);
+  createCountryBadge(country) {
+    const badge = document.createElement("span");
+
+    Object.assign(badge.style, {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "8px",
+      padding: "6px 10px",
+      borderRadius: "6px",
+      background: "rgba(255, 255, 255, 0.08)",
+      color: "#ffffff",
+      fontSize: "1rem",
+      lineHeight: "1",
+      whiteSpace: "nowrap",
+    });
+
+    badge.appendChild(country.flagImg(24, 18, 0));
+
+    const name = document.createElement("span");
+    name.textContent = country.name;
+
+    badge.appendChild(name);
+
+    return badge;
   }
-}
 
-function createBadgeRow() {
-  const row = document.createElement("div");
+  createTrustBadge(type) {
+    const badges = {
+      pride: {
+        text: "Our pride",
+        icon: icons.crownSvg,
+        bg: "#264b61bf",
+      },
+      base: {
+        text: "Based",
+        icon: icons.starSvg,
+        bg: "#553995bf",
+      },
+      approved: {
+        text: "You can listen",
+        icon: icons.thumbsUpSvg,
+        bg: "#23593ebf",
+      },
+      warning: {
+        text: "Be careful",
+        icon: icons.warningSvg,
+        bg: "#77471ebf",
+      },
+      blocked: {
+        text: "Don't listen",
+        icon: icons.banSvg,
+        bg: "#723433bf",
+      },
+      unknown: {
+        text: "Origin not confirmed",
+        icon: icons.unknownSvg,
+        bg: "#2f2f2fbf",
+      },
+      noInfo: {
+        text: "No artist info",
+        icon: icons.unknownSvg,
+        bg: "#2f2f2fbf",
+      },
+    };
 
-  row.classList.add("uafy-badge-row");
+    const badgeData = badges[type] ?? badges.noInfo;
 
-  Object.assign(row.style, {
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: "8px",
-    gap: "10px",
-    flexWrap: "wrap",
-  });
+    const badge = document.createElement("span");
+    badge.classList.add("uafy-trust-badge");
+    badge.dataset.type = type;
 
-  return row;
-}
+    badge.innerHTML = `<span>${badgeData.text}</span>${badgeData.icon}`;
 
-function createTrustBadge(type) {
-  const badges = {
-    pride: {
-      text: "Our pride",
-      icon: icons.crownSvg,
-      bg: "#264b61bf",
-    },
-    base: {
-      text: "Based",
-      icon: icons.starSvg,
-      bg: "#553995bf",
-    },
-    approved: {
-      text: "You can listen",
-      icon: icons.thumbsUpSvg,
-      bg: "#23593ebf",
-    },
-    warning: {
-      text: "Be careful",
-      icon: icons.warningSvg,
-      bg: "#77471ebf",
-    },
-    blocked: {
-      text: "Don't listen",
-      icon: icons.banSvg,
-      bg: "#723433bf",
-    },
-    unknown: {
-      text: "Unknown origin",
-      icon: icons.unknownSvg,
-      bg: "#2f2f2fbf",
-    },
-    noInfo: {
-      text: "No artist info",
-      icon: icons.unknownSvg,
-      bg: "linear-gradient(90deg, rgba(255,0,0,0.3), rgba(255,165,0,0.3), rgba(255,255,0,0.3), rgba(0,128,0,0.3), rgba(0,0,255,0.3), rgba(75,0,130,0.3), rgba(238,130,238,0.3))",
-    },
-  };
+    Object.assign(badge.style, {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "6px 10px",
+      borderRadius: "6px",
+      background: badgeData.bg,
+      color: "#ffffff",
+      fontSize: "1rem",
+      lineHeight: "1",
+      whiteSpace: "nowrap",
+    });
 
-  const badgeData = badges[type] ?? badges.noInfo;
+    return badge;
+  }
 
-  const badge = document.createElement("span");
-  badge.classList.add("uafy-trust-badge");
-  badge.dataset.type = type;
+  createSimpleTag(text) {
+    const tag = document.createElement("span");
+    tag.textContent = text;
 
-  badge.innerHTML = `
-    <span>${badgeData.text}</span>
-    ${badgeData.icon}
-  `;
+    Object.assign(tag.style, {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "6px 10px",
+      borderRadius: "6px",
+      background: "#2f2f2fbf",
+      color: "#ffffff",
+      fontSize: "1rem",
+      lineHeight: "1",
+      whiteSpace: "nowrap",
+    });
 
-  Object.assign(badge.style, {
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "6px 10px",
-    borderRadius: "6px",
-    background: badgeData.bg,
-    color: "#ffffff",
-    fontSize: "1rem",
-    lineHeight: "1",
-    whiteSpace: "nowrap",
-  });
+    return tag;
+  }
 
-  return badge;
-}
+  createInfoSeparator() {
+    const separator = document.createElement("span");
+    separator.classList.add("uafy-info-separator");
 
-async function fetchArtist(artist) {
-  const data = await Spicetify.CosmosAsync.get(
-    checkURL + encodeURIComponent(artistURL + artist),
-  );
+    Object.assign(separator.style, {
+      width: "1px",
+      height: "100%",
+      background: "rgba(255, 255, 255, 0.35)",
+      minHeight: "24px",
+    });
 
-  const item = data?.data?.items?.[0];
-  const name = item?.name || null;
-  const countries = (item?.countries || []).map(
-    (el) => new Country(el.name, el.originalName?.split(" ")[0] || ""),
-  );
-
-  const labels = (item?.listenLabels || []).map((el) => el.name);
-
-  return new Artist(name, artist, countries, labels);
-}
-
-async function getTrackArtists(track) {
-  const trackArtistsUrls = (track?.artists || []).map(
-    (a) => a.uri.split(":")[2],
-  );
-
-  return await Promise.all(trackArtistsUrls.map((el) => fetchArtist(el)));
-}
-
-function emojiToCountryCode(emoji) {
-  return Array.from(emoji)
-    .map((c) => String.fromCharCode(c.codePointAt(0) - 127397))
-    .join("")
-    .toLowerCase();
-}
-
-function flagImg(emoji, width, height, marginLeft) {
-  const code = emojiToCountryCode(emoji);
-
-  const img = document.createElement("img");
-  img.src = `https://flagcdn.com/${width}x${height}/${code}.png`;
-  img.alt = code;
-  img.style.marginLeft = `${marginLeft}px`;
-  img.style.verticalAlign = "middle";
-  img.style.width = `${width}px`;
-  img.style.height = `${height}px`;
-
-  return img;
+    return separator;
+  }
 }
 
 function waitForArtistToLoad(previousHeader, timeout = 5000) {
@@ -201,7 +262,9 @@ function waitForArtistToLoad(previousHeader, timeout = 5000) {
     const start = Date.now();
 
     const observer = new MutationObserver(() => {
-      const header = document.querySelector(".main-entityHeader-headerText");
+      const header = document.querySelector(
+        ".main-entityHeader-imageContainerWrapper",
+      );
 
       const currentName = header
         ?.querySelector(".main-entityHeader-title span")
@@ -234,93 +297,149 @@ async function loadArtistPage(location = Spicetify.Platform.History.location) {
   const pageType = location.pathname.split("/")[1];
   const id = location.pathname.split("/")[2];
   if (pageType === "artist") {
-    const oldHeader = document.querySelector(".main-entityHeader-headerText");
+    const oldHeader = document.querySelector(
+      ".main-entityHeader-imageContainerWrapper",
+    );
 
-    const artistHeader = await waitForArtistToLoad(oldHeader);
+    let artistHeader = document.querySelector(
+      ".main-entityHeader-imageContainerWrapper",
+    );
+
+    artistHeader = await waitForArtistToLoad(null);
 
     if (!artistHeader) return;
 
-    const artistNameSpan = artistHeader.querySelector(
-      ".main-entityHeader-title span",
+    artistHeader.style.setProperty("height", "auto", "important");
+
+    const headerText = artistHeader.querySelector(
+      ".main-entityHeader-headerText",
     );
 
-    if (!artistNameSpan) return;
+    if (!headerText) return;
 
     const artist = await fetchArtist(id);
 
-    artist.countries.forEach((ct, i) => {
-      const img = flagImg(ct.emoji, 96, 72, i === 0 ? 25 : 5);
-      artistNameSpan.appendChild(img);
-    });
+    artistHeader.querySelector(".uafy-artist-info-section")?.remove();
 
-    artistHeader.querySelector(".uafy-badge-row")?.remove();
+    const infoSection = artist.createArtistInfoSection();
 
-    const badgeRow = createBadgeRow();
-
-    if (!artist?.labels?.length) {
-      badgeRow.appendChild(createTrustBadge("noInfo"));
-    } else {
-      artist.labels.forEach((label) => {
-        const badge = createTrustBadge(label);
-        badgeRow.appendChild(badge);
-      });
-    }
-
-    artistHeader.appendChild(badgeRow);
+    headerText.appendChild(infoSection);
   }
 }
 
-function main() {
-  loadArtistPage();
-
-  Spicetify.Player.addEventListener("songchange", async (event) => {
-    const track = Spicetify.Player.data?.item;
-    const trackName = track?.name;
-
-    const trackArtists = await getTrackArtists(track);
-
-    console.log("Now playing:", trackName);
-    console.log(trackArtists);
-
-    const isBlocked = trackArtists.some((artist) =>
-      artist.labels.some((label) =>
-        ["blocked", "unknown", "warning"].includes(label.toLowerCase()),
-      ),
+async function fetchArtist(artist) {
+  try {
+    const data = await Spicetify.CosmosAsync.get(
+      checkURL + encodeURIComponent(artistURL + artist),
     );
 
-    if (isBlocked) {
-      Spicetify.Player.next();
+    const item = data?.data?.items?.[0];
+
+    if (!item) {
+      return new Artist(null, artist, [], []);
     }
 
-    const allArtistSpans = [
-      document.querySelector(
-        "div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
-      ),
-      document.querySelector(
-        "div.Root__right-sidebar div.main-nowPlayingView-nowPlayingWidget div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
-      ),
-    ];
+    const name = item.name || null;
 
-    allArtistSpans.forEach((span) => {
-      span.querySelectorAll("a").forEach((a) => {
-        const id = a.href.split("/").pop();
-
-        const artist = trackArtists.find((art) => art.url === id);
-        if (!artist?.name) return;
-
-        const innerSpan = a.closest("span");
-        if (!innerSpan) return;
-
-        artist.countries.forEach((ct) => {
-          const img = flagImg(ct.emoji, 16, 12, 4);
-          innerSpan.appendChild(img);
-        });
-      });
+    const countries = (item.countries || []).map((el) => {
+      const countryInfo = el.originalName?.split(" ");
+      return new Country(countryInfo[1], countryInfo[0] || "");
     });
+
+    const labels = (item.listenLabels || []).map((el) => el.name);
+
+    return new Artist(name, artist, countries, labels);
+  } catch (error) {
+    console.error("Failed to fetch artist:", artist, error);
+    return new Artist(null, artist, [], []);
+  }
+}
+
+async function getTrackArtists(track) {
+  const trackArtistsUrls = (track?.artists || []).map(
+    (a) => a.uri.split(":")[2],
+  );
+
+  return await Promise.all(trackArtistsUrls.map((el) => fetchArtist(el)));
+}
+
+async function loadNowPlayingArtistFlags() {
+  const track = Spicetify.Player.data?.item;
+  if (!track) return;
+
+  const trackName = track?.name;
+
+  const trackArtists = await getTrackArtists(track);
+
+  console.log("Now playing:", trackName);
+  console.log(trackArtists);
+
+  const isBlocked = trackArtists.some((artist) =>
+    artist.labels.some((label) =>
+      ["blocked", "unknown", "warning"].includes(label.toLowerCase()),
+    ),
+  );
+
+  // if (isBlocked) {
+  //   Spicetify.Player.next();
+  // }
+
+  const allArtistSpans = [
+    document.querySelector(
+      "div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
+    ),
+    document.querySelector(
+      "div.Root__right-sidebar div.main-nowPlayingView-nowPlayingWidget div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
+    ),
+  ].filter(Boolean);
+
+  allArtistSpans.forEach((span) => {
+    span.querySelectorAll("a").forEach((a) => {
+      const id = a.href.split("/").pop();
+
+      const artist = trackArtists.find((art) => art.url === id);
+      if (!artist?.name) return;
+
+      const innerSpan = a.closest("span");
+      if (!innerSpan) return;
+
+      innerSpan.querySelectorAll(".uafy-artist-flag").forEach((flag) => {
+        flag.remove();
+      });
+
+      artist.countries.forEach((ct) =>
+        innerSpan
+          .appendChild(ct.flagImg(16, 12, 4))
+          .classList.add("uafy-artist-flag"),
+      );
+    });
+  });
+}
+
+async function startup() {
+  const currentLocation = Spicetify.Platform.History.location;
+
+  if (currentLocation.pathname.split("/")[1] === "artist") {
+    await loadArtistPage(currentLocation);
+  }
+
+  await loadNowPlayingArtistFlags();
+
+  setTimeout(loadNowPlayingArtistFlags, 500);
+  setTimeout(loadNowPlayingArtistFlags, 1500);
+}
+
+function main() {
+  startup().catch((error) => {
+    console.error("UAfy startup failed:", error);
+  });
+
+  Spicetify.Player.addEventListener("songchange", async (event) => {
+    await loadNowPlayingArtistFlags();
   });
 
   Spicetify.Platform.History.listen(async (location) => {
-    loadArtistPage(location);
+    await loadArtistPage(location);
   });
 }
 
