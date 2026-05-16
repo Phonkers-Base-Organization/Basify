@@ -1208,6 +1208,452 @@ class SettingsMenu {
   }
 }
 
+class SkipToastRenderer {
+  static styleElementId = "uafy-skip-toast-style";
+  static containerClassName = "uafy-skip-toast-container";
+  static toastDurationMs = 6000;
+
+  static async show(track, trackArtists, skipReasons) {
+    const settings = LocalStorageManager.getSettings();
+
+    if (!settings.popupEnabled) return;
+
+    SkipToastRenderer.injectStyles();
+
+    const dominantColor =
+      await SkipToastRenderer.getDominantColorFromTrack(track);
+
+    const container = SkipToastRenderer.createContainer();
+    const toast = SkipToastRenderer.createToast(
+      track,
+      trackArtists,
+      skipReasons,
+      dominantColor,
+    );
+
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.classList.add("is-visible");
+    });
+
+    setTimeout(() => {
+      SkipToastRenderer.removeToast(toast);
+    }, SkipToastRenderer.toastDurationMs);
+  }
+
+  static async getDominantColorFromTrack(track) {
+    const imageUrl = SkipToastRenderer.getTrackImageUrl(track);
+
+    if (!imageUrl) return null;
+
+    return SkipToastRenderer.extractDominantColorFromImage(imageUrl);
+  }
+
+  static getTrackImageUrl(track) {
+    const imageUri =
+      track?.images?.[0]?.url ||
+      track?.album?.images?.[0]?.url ||
+      track?.metadata?.image_xlarge_url ||
+      track?.metadata?.image_large_url ||
+      track?.metadata?.image_url;
+
+    if (!imageUri) return null;
+
+    if (imageUri.startsWith("https://")) {
+      return imageUri;
+    }
+
+    const imageId = imageUri.split(":")?.[2];
+
+    if (!imageId) return null;
+
+    return `https://i.scdn.co/image/${imageId}`;
+  }
+
+  static extractDominantColorFromImage(imageUrl) {
+    return new Promise((resolve) => {
+      const image = new Image();
+
+      image.crossOrigin = "anonymous";
+      image.src = imageUrl;
+
+      image.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const size = 48;
+
+          canvas.width = size;
+          canvas.height = size;
+
+          const context = canvas.getContext("2d", {
+            willReadFrequently: true,
+          });
+
+          context.drawImage(image, 0, 0, size, size);
+
+          const pixels = context.getImageData(0, 0, size, size).data;
+          const colorBuckets = new Map();
+
+          for (let index = 0; index < pixels.length; index += 4) {
+            const alpha = pixels[index + 3];
+
+            if (alpha < 128) continue;
+
+            const red = pixels[index];
+            const green = pixels[index + 1];
+            const blue = pixels[index + 2];
+
+            const brightness = (red + green + blue) / 3;
+
+            if (brightness < 25 || brightness > 235) continue;
+
+            const quantizedRed = Math.round(red / 24) * 24;
+            const quantizedGreen = Math.round(green / 24) * 24;
+            const quantizedBlue = Math.round(blue / 24) * 24;
+
+            const key = `${quantizedRed},${quantizedGreen},${quantizedBlue}`;
+
+            colorBuckets.set(key, (colorBuckets.get(key) || 0) + 1);
+          }
+
+          let dominantColor = null;
+          let dominantCount = 0;
+
+          colorBuckets.forEach((count, color) => {
+            if (count > dominantCount) {
+              dominantColor = color;
+              dominantCount = count;
+            }
+          });
+
+          if (!dominantColor) {
+            resolve(null);
+            return;
+          }
+
+          const [red, green, blue] = dominantColor.split(",").map(Number);
+
+          resolve(SkipToastRenderer.rgbToHex(red, green, blue));
+        } catch (error) {
+          console.warn("UAfy failed to extract dominant image color:", error);
+          resolve(null);
+        }
+      };
+
+      image.onerror = () => {
+        resolve(null);
+      };
+    });
+  }
+
+  static rgbToHex(red, green, blue) {
+    return `#${[red, green, blue]
+      .map((value) => {
+        return value.toString(16).padStart(2, "0");
+      })
+      .join("")}`;
+  }
+
+  static createContainer() {
+    let container = document.querySelector(
+      `.${SkipToastRenderer.containerClassName}`,
+    );
+
+    if (container) return container;
+
+    container = document.createElement("div");
+    container.className = SkipToastRenderer.containerClassName;
+
+    document.body.appendChild(container);
+
+    return container;
+  }
+
+  static createToast(track, trackArtists, skipReasons, dominantColor) {
+    const toast = document.createElement("div");
+    toast.className = "uafy-skip-toast";
+
+    SkipToastRenderer.applyDominantColorBackground(toast, dominantColor);
+
+    const header = document.createElement("div");
+    header.className = "uafy-skip-toast-header";
+
+    const title = document.createElement("div");
+    title.className = "uafy-skip-toast-title";
+    title.textContent = "Track skipped";
+
+    const closeButton = document.createElement("button");
+    closeButton.className = "uafy-skip-toast-close";
+    closeButton.type = "button";
+    closeButton.textContent = "×";
+
+    closeButton.addEventListener("click", () => {
+      SkipToastRenderer.removeToast(toast);
+    });
+
+    header.append(title, closeButton);
+
+    const trackName = document.createElement("div");
+    trackName.className = "uafy-skip-toast-track";
+    trackName.textContent = track.name || "Unknown track";
+
+    const artistsWrapper = document.createElement("div");
+    artistsWrapper.className = "uafy-skip-toast-artists";
+
+    const groupedReasons =
+      SkipToastRenderer.groupSkipReasonsByArtist(skipReasons);
+
+    groupedReasons.forEach((artistReasons) => {
+      const artist = trackArtists.find((trackArtist) => {
+        return trackArtist.id === artistReasons.artistId;
+      });
+
+      artistsWrapper.appendChild(
+        SkipToastRenderer.createArtistReasonRow(artist, artistReasons.labels),
+      );
+    });
+
+    toast.append(header, trackName, artistsWrapper);
+
+    return toast;
+  }
+
+  static applyDominantColorBackground(toast, dominantColor) {
+    if (!dominantColor) return;
+
+    toast.style.background = `
+      linear-gradient(
+        180deg,
+        ${dominantColor} 0%,
+        color-mix(in srgb, ${dominantColor} 45%, var(--spice-card, #181818)) 30%,
+        var(--spice-card, #181818) 80%
+      )
+    `;
+
+    toast.style.backgroundClip = "padding-box";
+  }
+
+  static groupSkipReasonsByArtist(skipReasons) {
+    const groupedReasons = new Map();
+
+    skipReasons.forEach((reason) => {
+      if (!groupedReasons.has(reason.artistId)) {
+        groupedReasons.set(reason.artistId, {
+          artistId: reason.artistId,
+          artistName: reason.artistName,
+          labels: [],
+        });
+      }
+
+      groupedReasons.get(reason.artistId).labels.push(reason.label);
+    });
+
+    return Array.from(groupedReasons.values());
+  }
+
+  static createArtistReasonRow(artist, labels) {
+    const row = document.createElement("div");
+    row.className = "uafy-skip-toast-artist-row";
+
+    const artistName = document.createElement("button");
+    artistName.className = "uafy-skip-toast-artist-name";
+    artistName.type = "button";
+    artistName.textContent = artist?.name || "Unknown artist";
+
+    if (artist?.id) {
+      artistName.addEventListener("click", () => {
+        event.stopPropagation();
+        Spicetify.Platform.History.push(`/artist/${artist.id}`);
+      });
+    }
+
+    const badgesWrapper = document.createElement("div");
+    badgesWrapper.className = "uafy-skip-toast-badges";
+
+    const uniqueLabels = [...new Set(labels)];
+
+    uniqueLabels.forEach((label) => {
+      const badge = ArtistInfoSectionRenderer.createTrustBadge(label);
+      badge.classList.add("uafy-skip-toast-badge");
+
+      badgesWrapper.appendChild(badge);
+    });
+
+    row.append(artistName, badgesWrapper);
+
+    return row;
+  }
+
+  static removeToast(toast) {
+    toast.classList.remove("is-visible");
+    toast.classList.add("is-removing");
+
+    setTimeout(() => {
+      const container = toast.closest(
+        `.${SkipToastRenderer.containerClassName}`,
+      );
+
+      toast.remove();
+
+      if (container && !container.children.length) {
+        container.remove();
+      }
+    }, 200);
+  }
+
+  static injectStyles() {
+    if (document.getElementById(SkipToastRenderer.styleElementId)) return;
+
+    const style = document.createElement("style");
+    style.id = SkipToastRenderer.styleElementId;
+
+    style.textContent = `
+      .uafy-skip-toast-container {
+        position: fixed;
+        right: 24px;
+        bottom: 112px;
+        z-index: 999999;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 350px;
+        max-width: calc(100vw - 48px);
+        pointer-events: none;
+      }
+
+      .uafy-skip-toast {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 12px;
+        background: var(--spice-card, #181818);
+        color: var(--spice-text, #ffffff);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+        transition:
+          opacity 0.2s ease,
+          transform 0.2s ease;
+        pointer-events: auto;
+        overflow: hidden;
+      }
+
+      .uafy-skip-toast.is-visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .uafy-skip-toast.is-removing {
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+      }
+
+      .uafy-skip-toast-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .uafy-skip-toast-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--spice-subtext, #b3b3b3);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .uafy-skip-toast-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--spice-subtext, #b3b3b3);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+      }
+
+      .uafy-skip-toast-close:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--spice-text, #ffffff);
+      }
+
+      .uafy-skip-toast-track {
+        font-size: 18px;
+        font-weight: 800;
+        line-height: 1.25;
+      }
+
+      .uafy-skip-toast-artists {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .uafy-skip-toast-artist-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .uafy-skip-toast-artist-name {
+        min-width: 0;
+        flex: 1;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: var(--spice-text, #ffffff);
+        font-size: 14px;
+        font-weight: 800;
+        text-align: left;
+        text-decoration: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+      }
+
+      .uafy-skip-toast-artist-name:hover {
+        color: var(--spice-button, #1ed760);
+        text-decoration: underline;
+      }
+
+      .uafy-skip-toast-badges {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 8px;
+        flex: 0 0 auto;
+      }
+
+      .uafy-skip-toast-badge {
+        font-size: 12px !important;
+        padding: 5px 8px !important;
+      }
+
+      .uafy-skip-toast-badge svg {
+        width: 16px !important;
+        height: 16px !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+}
+
 async function loadArtistPage(location = Spicetify.Platform.History.location) {
   const pageType = location.pathname.split("/")[1];
   const artistId = location.pathname.split("/")[2];
@@ -1310,6 +1756,8 @@ async function loadNowPlayingArtistFlags(timeoutMs = 5000) {
       artists: trackArtists.map((artist) => artist.id),
       reasons: blockedTrackLabels,
     });
+
+    SkipToastRenderer.show(track, trackArtists, blockedTrackLabels);
 
     Spicetify.Player.next();
     return;
