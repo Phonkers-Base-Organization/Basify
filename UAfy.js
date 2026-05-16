@@ -14,7 +14,16 @@ class LocalStorageManager {
     artistsById: {},
     skippedTracks: [],
     settings: {
-      artistCacheLimit: 100,
+      skipEnabled: false,
+      skipBlockedArtists: true,
+      skipWarningArtists: false,
+      skipUnknownArtists: false,
+
+      popupEnabled: true,
+      emojiFlags: true,
+      formatNowPlayingBar: true,
+
+      artistCacheLimit: 150,
       skippedTracksLimit: 20,
     },
   };
@@ -631,6 +640,474 @@ class DomObserver {
   }
 }
 
+class SettingsMenu {
+  static button = null;
+  static styleElementId = "uafy-settings-style";
+
+  static icons = {
+    settings: `<svg role="img" height="19.25" width="19.25" viewBox="0 0 36 36" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M32.57,15.72l-3.35-1a11.65,11.65,0,0,0-.95-2.33l1.64-3.07a.61.61,0,0,0-.11-.72L27.41,6.2a.61.61,0,0,0-.72-.11L23.64,7.72a11.62,11.62,0,0,0-2.36-1l-1-3.31A.61.61,0,0,0,19.69,3H16.31a.61.61,0,0,0-.58.43l-1,3.3a11.63,11.63,0,0,0-2.38,1l-3-1.62a.61.61,0,0,0-.72.11L6.2,8.59a.61.61,0,0,0-.11.72l1.62,3a11.63,11.63,0,0,0-1,2.37l-3.31,1a.61.61,0,0,0-.43.58v3.38a.61.61,0,0,0,.43.58l3.33,1a11.62,11.62,0,0,0,1,2.33L6.09,26.69a.61.61,0,0,0,.11.72L8.59,29.8a.61.61,0,0,0,.72.11l3.09-1.65a11.65,11.65,0,0,0,2.3.94l1,3.37a.61.61,0,0,0,.58.43h3.38a.61.61,0,0,0,.58-.43l1-3.38a11.63,11.63,0,0,0,2.28-.94l3.11,1.66a.61.61,0,0,0,.72-.11l2.39-2.39a.61.61,0,0,0,.11-.72l-1.66-3.1a11.63,11.63,0,0,0,.95-2.29l3.37-1a.61.61,0,0,0,.43-.58V16.31A.61.61,0,0,0,32.57,15.72ZM18,23.5A5.5,5.5,0,1,1,23.5,18,5.5,5.5,0,0,1,18,23.5Z" />
+    </svg>`,
+  };
+
+  static registerButton() {
+    if (SettingsMenu.button) return;
+
+    SettingsMenu.injectStyles();
+
+    SettingsMenu.button = new Spicetify.Topbar.Button(
+      "UAfy Settings",
+      SettingsMenu.icons.settings,
+      SettingsMenu.open,
+      false,
+      true,
+    );
+  }
+
+  static open() {
+    const React = Spicetify.React;
+    const ReactDOM = Spicetify.ReactDOM;
+
+    const container = document.createElement("div");
+    container.className = "uafy-settings-react-root";
+
+    Spicetify.PopupModal.display({
+      title: "UAfy Settings",
+      content: container,
+      isLarge: true,
+    });
+
+    ReactDOM.render(React.createElement(SettingsMenu.Component), container);
+  }
+
+  static Component() {
+    const React = Spicetify.React;
+
+    const [settings, setSettings] = React.useState(() => {
+      return LocalStorageManager.getSettings();
+    });
+
+    const saveSettings = async (newSettings) => {
+      setSettings((currentSettings) => {
+        return {
+          ...currentSettings,
+          ...newSettings,
+        };
+      });
+
+      await LocalStorageManager.updateSettings(newSettings);
+    };
+
+    return React.createElement(
+      "div",
+      {
+        className: "uafy-settings-menu",
+      },
+
+      React.createElement(SettingsMenu.SectionTitle, {
+        title: "Skipping",
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Skip tracks",
+        description:
+          "Automatically skip tracks based on the selected status filters.",
+        value: settings.skipEnabled,
+        onChange: (value) => {
+          saveSettings({
+            skipEnabled: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.SubSectionTitle, {
+        title: "Skip status filter",
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Blocked",
+        description: "Skip artists marked as blocked.",
+        value: settings.skipBlockedArtists,
+        onChange: (value) => {
+          saveSettings({
+            skipBlockedArtists: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Warning",
+        description: "Skip artists marked as warning.",
+        value: settings.skipWarningArtists,
+        onChange: (value) => {
+          saveSettings({
+            skipWarningArtists: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Unknown",
+        description: "Skip artists with unknown origin or status.",
+        value: settings.skipUnknownArtists,
+        onChange: (value) => {
+          saveSettings({
+            skipUnknownArtists: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.SectionTitle, {
+        title: "Popup",
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Show skip popup",
+        description: "Show a notification when UAfy skips a track.",
+        value: settings.popupEnabled,
+        onChange: (value) => {
+          saveSettings({
+            popupEnabled: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.SectionTitle, {
+        title: "Flags",
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Use emoji flags",
+        description:
+          "Use country emoji flags instead of flag images in now playing and artist profile.",
+        value: settings.emojiFlags,
+        onChange: (value) => {
+          saveSettings({
+            emojiFlags: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.SectionTitle, {
+        title: "Now Playing",
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Format now playing bar",
+        description:
+          "Highlight the now playing bar when one of the artists has a warning, blocked, or unknown label.",
+        value: settings.formatNowPlayingBar,
+        onChange: (value) => {
+          saveSettings({
+            formatNowPlayingBar: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.SectionTitle, {
+        title: "Storage",
+      }),
+
+      React.createElement(SettingsMenu.NumberRow, {
+        label: "Artist cache limit",
+        description: "Maximum number of artists stored locally.",
+        value: settings.artistCacheLimit,
+        min: 1,
+        max: 1000,
+        onChange: (value) => {
+          saveSettings({
+            artistCacheLimit: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.NumberRow, {
+        label: "Skipped tracks limit",
+        description: "Maximum number of skipped tracks saved in history.",
+        value: settings.skippedTracksLimit,
+        min: 1,
+        max: 100,
+        onChange: (value) => {
+          saveSettings({
+            skippedTracksLimit: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.SectionTitle, {
+        title: "Reset",
+      }),
+
+      React.createElement(SettingsMenu.ButtonRow, {
+        label: "Clear UAfy data",
+        description:
+          "This clears cached artists, skipped tracks, and settings.",
+        buttonText: "Reset",
+        onClick: () => {
+          LocalStorageManager.clearAll();
+          Spicetify.showNotification("UAfy data has been reset");
+          SettingsMenu.open();
+        },
+      }),
+    );
+  }
+
+  static SectionTitle({ title }) {
+    return Spicetify.React.createElement(
+      "h2",
+      {
+        className: "uafy-settings-section-title",
+      },
+      title,
+    );
+  }
+
+  static SubSectionTitle({ title }) {
+    return Spicetify.React.createElement(
+      "div",
+      {
+        className: "uafy-settings-subsection-title",
+      },
+      title,
+    );
+  }
+
+  static ToggleRow({ label, description, value, onChange }) {
+    const React = Spicetify.React;
+    const Toggle = Spicetify.ReactComponent.Toggle;
+
+    return React.createElement(
+      "div",
+      {
+        className: "uafy-settings-row",
+      },
+
+      React.createElement(SettingsMenu.RowText, {
+        label,
+        description,
+      }),
+
+      React.createElement(Toggle, {
+        value,
+        checked: value,
+        isChecked: value,
+        onSelected: () => {
+          onChange(!value);
+        },
+      }),
+    );
+  }
+
+  static NumberRow({ label, description, value, min, max, onChange }) {
+    const React = Spicetify.React;
+
+    const [inputValue, setInputValue] = React.useState(String(value));
+
+    React.useEffect(() => {
+      setInputValue(String(value));
+    }, [value]);
+
+    const saveValue = () => {
+      const numberValue = Number(inputValue);
+
+      if (!Number.isFinite(numberValue)) {
+        setInputValue(String(value));
+        return;
+      }
+
+      const clampedValue = Math.min(
+        max,
+        Math.max(min, Math.floor(numberValue)),
+      );
+
+      setInputValue(String(clampedValue));
+      onChange(clampedValue);
+    };
+
+    return React.createElement(
+      "div",
+      {
+        className: "uafy-settings-row",
+      },
+
+      React.createElement(SettingsMenu.RowText, {
+        label,
+        description,
+      }),
+
+      React.createElement("input", {
+        className: "uafy-settings-number",
+        type: "number",
+        min,
+        max,
+        value: inputValue,
+        onChange: (event) => {
+          setInputValue(event.target.value);
+        },
+        onBlur: () => {
+          saveValue();
+        },
+        onKeyDown: (event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+
+          if (event.key === "Escape") {
+            setInputValue(String(value));
+            event.currentTarget.blur();
+          }
+        },
+      }),
+    );
+  }
+
+  static ButtonRow({ label, description, buttonText, onClick }) {
+    const React = Spicetify.React;
+
+    return React.createElement(
+      "div",
+      {
+        className: "uafy-settings-row",
+      },
+
+      React.createElement(SettingsMenu.RowText, {
+        label,
+        description,
+      }),
+
+      React.createElement(
+        "button",
+        {
+          className:
+            "Button-sc-qlcn5g-0 Button-small-buttonSecondary-useBrowserDefaultFocusStyle uafy-settings-button",
+          type: "button",
+          onClick,
+        },
+        buttonText,
+      ),
+    );
+  }
+
+  static RowText({ label, description }) {
+    const React = Spicetify.React;
+
+    return React.createElement(
+      "div",
+      {
+        className: "uafy-settings-text-wrapper",
+      },
+
+      React.createElement(
+        "div",
+        {
+          className: "uafy-settings-label",
+        },
+        label,
+      ),
+
+      description
+        ? React.createElement(
+            "div",
+            {
+              className: "uafy-settings-description",
+            },
+            description,
+          )
+        : null,
+    );
+  }
+
+  static injectStyles() {
+    if (document.getElementById(SettingsMenu.styleElementId)) return;
+
+    const style = document.createElement("style");
+    style.id = SettingsMenu.styleElementId;
+
+    style.textContent = `
+      .uafy-settings-react-root {
+        min-width: 460px;
+      }
+
+      .uafy-settings-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 4px 0 18px;
+      }
+
+      .uafy-settings-section-title {
+        margin: 18px 0 4px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+        color: var(--spice-text);
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .uafy-settings-subsection-title {
+        margin-top: 6px;
+        color: var(--spice-subtext);
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .uafy-settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        min-height: 42px;
+      }
+
+      .uafy-settings-text-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .uafy-settings-label {
+        color: var(--spice-text);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .uafy-settings-description {
+        color: var(--spice-subtext);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .uafy-settings-number {
+        width: 80px;
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 6px;
+        background: var(--spice-main);
+        color: var(--spice-text);
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .uafy-settings-button {
+        min-width: 90px;
+        height: 40px;
+        border-radius: 999px;
+        border: 0;
+        padding: 0 18px;
+        background: var(--spice-button);
+        color: var(--spice-main);
+        font-weight: 700;
+        cursor: pointer;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+}
+
 async function loadArtistPage(location = Spicetify.Platform.History.location) {
   const pageType = location.pathname.split("/")[1];
   const artistId = location.pathname.split("/")[2];
@@ -683,6 +1160,23 @@ async function getTrackArtists(track) {
   );
 }
 
+function getBlockedTrackLabels(trackArtists) {
+  const blockedLabels = ["blocked", "unknown", "warning"];
+
+  return trackArtists.flatMap((artist) => {
+    return artist.labels
+      .map((label) => label.toLowerCase())
+      .filter((label) => blockedLabels.includes(label))
+      .map((label) => {
+        return {
+          artistId: artist.id,
+          artistName: artist.name,
+          label,
+        };
+      });
+  });
+}
+
 async function loadNowPlayingArtistFlags(timeoutMs = 5000) {
   const track = await DomObserver.waitUntil(() => {
     const track = Spicetify.Player.data?.item;
@@ -707,15 +1201,19 @@ async function loadNowPlayingArtistFlags(timeoutMs = 5000) {
     return;
   }
 
-  const isBlocked = trackArtists.some((artist) => {
-    return artist.labels.some((label) => {
-      return ["blocked", "unknown", "warning"].includes(label.toLowerCase());
-    });
-  });
+  const blockedTrackLabels = getBlockedTrackLabels(trackArtists);
 
-  // if (isBlocked) {
-  //   Spicetify.Player.next();
-  // }
+  if (blockedTrackLabels.length) {
+    await LocalStorageManager.addSkippedTrack({
+      id: track.uri.split(":")[2],
+      name: track.name,
+      artists: trackArtists.map((artist) => artist.id),
+      reasons: blockedTrackLabels,
+    });
+
+    Spicetify.Player.next();
+    return;
+  }
 
   addFlagsToArtistSpans(artistSpans.bottomBarArtistSpans, trackArtists);
   addFlagsToArtistSpans(artistSpans.sideViewArtistSpans, trackArtists);
@@ -743,6 +1241,8 @@ function addFlagsToArtistSpans(artistSpansById, trackArtists) {
 }
 
 async function startup() {
+  SettingsMenu.registerButton();
+
   const startupResults = await Promise.allSettled([
     loadArtistPage(),
     loadNowPlayingArtistFlags(),
@@ -779,7 +1279,13 @@ function main() {
     !Spicetify.Platform ||
     !Spicetify.Platform.History ||
     !Spicetify.LocalStorage ||
-    !Spicetify.CosmosAsync
+    !Spicetify.CosmosAsync ||
+    !Spicetify.Topbar ||
+    !Spicetify.PopupModal ||
+    !Spicetify.React ||
+    !Spicetify.ReactDOM ||
+    !Spicetify.ReactComponent ||
+    !Spicetify.ReactComponent.Toggle
   ) {
     setTimeout(init, 100);
     return;
