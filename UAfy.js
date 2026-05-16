@@ -14,6 +14,8 @@ class LocalStorageManager {
     artistsById: {},
     skippedTracks: [],
     settings: {
+      locale: "en",
+
       skipEnabled: false,
       skipBlockedArtists: true,
       skipWarningArtists: false,
@@ -187,6 +189,25 @@ class LocalStorageManager {
         data.settings.skippedTracksLimit,
       );
     });
+  }
+
+  static async resetSettings() {
+    const defaultSettings = structuredClone(
+      LocalStorageManager.defaultData.settings,
+    );
+
+    await LocalStorageManager.updateData((data) => {
+      data.settings = defaultSettings;
+
+      LocalStorageManager.trimArtistCache(data);
+
+      data.skippedTracks = data.skippedTracks.slice(
+        0,
+        data.settings.skippedTracksLimit,
+      );
+    });
+
+    return LocalStorageManager.getSettings();
   }
 
   static clearAll() {
@@ -698,11 +719,44 @@ class SettingsMenu {
       await LocalStorageManager.updateSettings(newSettings);
     };
 
+    const resetSettings = async () => {
+      const defaultSettings = await LocalStorageManager.resetSettings();
+
+      setSettings(defaultSettings);
+
+      Spicetify.showNotification("UAfy settings have been reset");
+    };
+
     return React.createElement(
       "div",
       {
         className: "uafy-settings-menu",
       },
+
+      React.createElement(SettingsMenu.SectionTitle, {
+        title: "Language",
+      }),
+
+      React.createElement(SettingsMenu.SelectRow, {
+        label: "Locale",
+        description: "Choose the language used by UAfy settings and messages.",
+        value: settings.locale,
+        options: [
+          {
+            value: "en",
+            label: "English",
+          },
+          {
+            value: "ua",
+            label: "Українська",
+          },
+        ],
+        onChange: (value) => {
+          saveSettings({
+            locale: value,
+          });
+        },
+      }),
 
       React.createElement(SettingsMenu.SectionTitle, {
         title: "Skipping",
@@ -843,11 +897,7 @@ class SettingsMenu {
         description:
           "This clears cached artists, skipped tracks, and settings.",
         buttonText: "Reset",
-        onClick: () => {
-          LocalStorageManager.clearAll();
-          Spicetify.showNotification("UAfy data has been reset");
-          SettingsMenu.open();
-        },
+        onClick: resetSettings,
       }),
     );
   }
@@ -895,6 +945,44 @@ class SettingsMenu {
           onChange(!value);
         },
       }),
+    );
+  }
+
+  static SelectRow({ label, description, value, options, onChange }) {
+    const React = Spicetify.React;
+
+    return React.createElement(
+      "div",
+      {
+        className: "uafy-settings-row",
+      },
+
+      React.createElement(SettingsMenu.RowText, {
+        label,
+        description,
+      }),
+
+      React.createElement(
+        "select",
+        {
+          className: "uafy-settings-select",
+          value,
+          onChange: (event) => {
+            onChange(event.target.value);
+          },
+        },
+
+        options.map((option) => {
+          return React.createElement(
+            "option",
+            {
+              key: option.value,
+              value: option.value,
+            },
+            option.label,
+          );
+        }),
+      ),
     );
   }
 
@@ -1091,6 +1179,18 @@ class SettingsMenu {
         font-weight: 600;
       }
 
+      .uafy-settings-select {
+        min-width: 130px;
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 6px;
+        background: var(--spice-main);
+        color: var(--spice-text);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
       .uafy-settings-button {
         min-width: 90px;
         height: 40px;
@@ -1170,7 +1270,7 @@ function getBlockedTrackLabels(trackArtists) {
       .map((label) => {
         return {
           artistId: artist.id,
-          artistName: artist.name,
+          artistName: artist.name, //TODO: remove in future
           label,
         };
       });
