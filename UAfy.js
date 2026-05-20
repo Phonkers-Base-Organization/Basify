@@ -20,14 +20,12 @@ class LocalStorageManager {
       skipBlockedArtists: true,
       skipWarningArtists: false,
       skipUnknownArtists: false,
-      allowSkippedTracksReplay: false,
 
       popupEnabled: true,
       emojiFlags: true,
       formatNowPlayingBar: true,
 
       artistCacheLimit: 150,
-      skippedTracksLimit: 20,
     },
   };
 
@@ -146,30 +144,6 @@ class LocalStorageManager {
     return updatedArtist;
   }
 
-  static getSkippedTracks() {
-    const data = LocalStorageManager.loadData();
-
-    return data.skippedTracks;
-  }
-
-  static async addSkippedTrack(track) {
-    await LocalStorageManager.updateData((data) => {
-      const skippedTrack = {
-        ...track,
-        skippedAt: Date.now(),
-      };
-
-      data.skippedTracks = data.skippedTracks.filter((t) => t.id !== track.id);
-
-      data.skippedTracks.unshift(skippedTrack);
-
-      data.skippedTracks = data.skippedTracks.slice(
-        0,
-        data.settings.skippedTracksLimit,
-      );
-    });
-  }
-
   static getSettings() {
     const data = LocalStorageManager.loadData();
 
@@ -184,11 +158,6 @@ class LocalStorageManager {
       };
 
       LocalStorageManager.trimArtistCache(data);
-
-      data.skippedTracks = data.skippedTracks.slice(
-        0,
-        data.settings.skippedTracksLimit,
-      );
     });
   }
 
@@ -201,11 +170,6 @@ class LocalStorageManager {
       data.settings = defaultSettings;
 
       LocalStorageManager.trimArtistCache(data);
-
-      data.skippedTracks = data.skippedTracks.slice(
-        0,
-        data.settings.skippedTracksLimit,
-      );
     });
 
     return LocalStorageManager.getSettings();
@@ -727,14 +691,7 @@ class SettingsMenu {
 
     NowPlayingRuntimeState.skipReasons = skipReasons;
 
-    if (!shouldSkipTrack(track, skipReasons)) return;
-
-    await LocalStorageManager.addSkippedTrack({
-      id: track.uri.split(":")[2],
-      name: track.name,
-      artists: trackArtists.map((artist) => artist.id),
-      reasons: skipReasons,
-    });
+    if (!shouldSkipTrack(skipReasons)) return;
 
     SkipToastRenderer.show(track, trackArtists, skipReasons);
 
@@ -870,25 +827,6 @@ class SettingsMenu {
         },
       }),
 
-      React.createElement(SettingsMenu.SubSectionTitle, {
-        title: "SReplay behavior",
-      }),
-
-      // TODO: replace this setting with track distributor skip check instead
-
-      React.createElement(SettingsMenu.ToggleRow, {
-        label: "Allow replaying skipped tracks",
-        description:
-          "If a track was already skipped by UAfy, it will be allowed to play when you manually return to it or start it yourself.",
-        value: settings.allowSkippedTracksReplay,
-        disabled: !settings.skipEnabled,
-        onChange: (value) => {
-          saveSettings({
-            allowSkippedTracksReplay: value,
-          });
-        },
-      }),
-
       React.createElement(SettingsMenu.SectionTitle, {
         title: "Popup",
       }),
@@ -953,28 +891,13 @@ class SettingsMenu {
         },
       }),
 
-      React.createElement(SettingsMenu.NumberRow, {
-        //TODO: remove local history of skipped tracks completely
-        label: "Skipped tracks limit",
-        description: "Maximum number of skipped tracks saved in history.",
-        value: settings.skippedTracksLimit,
-        min: 1,
-        max: 100,
-        onChange: (value) => {
-          saveSettings({
-            skippedTracksLimit: value,
-          });
-        },
-      }),
-
       React.createElement(SettingsMenu.SectionTitle, {
         title: "Reset",
       }),
 
       React.createElement(SettingsMenu.ButtonRow, {
         label: "Clear UAfy data",
-        description:
-          "This clears cached artists, skipped tracks, and settings.",
+        description: "This clears cached artists and settings.",
         buttonText: "Reset",
         onClick: resetSettings,
       }),
@@ -1556,6 +1479,7 @@ class SkipToastRenderer {
   }
 
   static groupSkipReasonsByArtist(skipReasons) {
+    // TODO: delete unnecessary data duplication
     const groupedReasons = new Map();
 
     skipReasons.forEach((reason) => {
@@ -2049,25 +1973,11 @@ function getSkipReasons(trustLabels) {
   });
 }
 
-function wasTrackAlreadySkipped(track) {
-  const trackId = track?.uri?.split(":")?.[2];
-
-  if (!trackId) return false;
-
-  return LocalStorageManager.getSkippedTracks().some((skippedTrack) => {
-    return skippedTrack.id === trackId;
-  });
-}
-
-function shouldSkipTrack(track, skipReasons) {
+function shouldSkipTrack(skipReasons) {
   const settings = LocalStorageManager.getSettings();
 
   if (!skipReasons.length) return false;
   if (!settings.skipEnabled) return false;
-
-  if (settings.allowSkippedTracksReplay && wasTrackAlreadySkipped(track)) {
-    return false;
-  }
 
   return true;
 }
@@ -2101,14 +2011,7 @@ async function loadNowPlayingArtistFlags(timeoutMs = 5000) {
 
   NowPlayingRuntimeState.update(track, trackArtists, trustLabels, skipReasons);
 
-  if (shouldSkipTrack(track, skipReasons)) {
-    await LocalStorageManager.addSkippedTrack({
-      id: track.uri.split(":")[2],
-      name: track.name,
-      artists: trackArtists.map((artist) => artist.id),
-      reasons: skipReasons,
-    });
-
+  if (shouldSkipTrack(skipReasons)) {
     SkipToastRenderer.show(track, trackArtists, skipReasons);
 
     Spicetify.Player.next();
