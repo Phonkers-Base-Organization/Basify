@@ -16,10 +16,11 @@ class LocalStorageManager {
     settings: {
       locale: "en",
 
-      skipEnabled: false,
+      skipEnabled: true,
       skipBlockedArtists: true,
       skipWarningArtists: false,
       skipUnknownArtists: false,
+      allowSkippedTracksReplay: false,
 
       popupEnabled: true,
       emojiFlags: true,
@@ -340,6 +341,44 @@ class ArtistInfoSectionRenderer {
     <path d="M13.9833 8.05342C13.8892 6.79321 13.3995 5.5949 12.5842 4.62938C11.7688 3.66386 10.6695 2.98043 9.44281 2.67655C8.21617 2.37266 6.9249 2.46384 5.75313 2.93708C4.58136 3.41032 3.58893 4.24145 2.91736 5.31196C2.24579 6.38247 1.92937 7.6377 2.01323 8.89863C2.09709 10.1596 2.57694 11.3618 3.38435 12.334C4.19176 13.3061 5.28551 13.9985 6.50963 14.3124C7.73375 14.6263 9.02573 14.5457 10.2013 14.0821M2.40002 6.5H13.6M2.40002 10.5H9.00002M7.66665 2.5C6.54354 4.29974 5.94812 6.37858 5.94812 8.5C5.94812 10.6214 6.54354 12.7003 7.66665 14.5M8.33337 2.5C9.51917 4.39925 10.1154 6.60736 10.0467 8.84533M9.34271 12.4473C9.07635 13.1638 8.73818 13.8516 8.33337 14.5M12.6666 15.1667V15.1734M12.6666 13.1668C12.9655 13.1658 13.2554 13.0646 13.4899 12.8794C13.7245 12.6942 13.8901 12.4356 13.9603 12.1451C14.0305 11.8546 14.0013 11.5489 13.8772 11.2771C13.7531 11.0052 13.5414 10.7828 13.276 10.6454C13.0107 10.5096 12.7074 10.4674 12.4152 10.5259C12.123 10.5844 11.8592 10.74 11.6666 10.9674" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   };
 
+  static badges = {
+    pride: {
+      text: "Our pride",
+      icon: ArtistInfoSectionRenderer.icons.crownSvg,
+      bg: "#264b61",
+    },
+    base: {
+      text: "Based",
+      icon: ArtistInfoSectionRenderer.icons.starSvg,
+      bg: "#553995",
+    },
+    approved: {
+      text: "You can listen",
+      icon: ArtistInfoSectionRenderer.icons.thumbsUpSvg,
+      bg: "#23593e",
+    },
+    warning: {
+      text: "Be careful",
+      icon: ArtistInfoSectionRenderer.icons.warningSvg,
+      bg: "#77471e",
+    },
+    blocked: {
+      text: "Don't listen",
+      icon: ArtistInfoSectionRenderer.icons.banSvg,
+      bg: "#723433",
+    },
+    unknown: {
+      text: "Origin not confirmed",
+      icon: ArtistInfoSectionRenderer.icons.unknownSvg,
+      bg: "#2f2f2f",
+    },
+    noInfo: {
+      text: "No artist info",
+      icon: ArtistInfoSectionRenderer.icons.unknownSvg,
+      bg: "#2f2f2f",
+    },
+  };
+
   static createArtistInfoSection(artist) {
     const section = document.createElement("div");
     section.classList.add("uafy-artist-info-section");
@@ -428,45 +467,9 @@ class ArtistInfoSectionRenderer {
   }
 
   static createTrustBadge(type) {
-    const badges = {
-      pride: {
-        text: "Our pride",
-        icon: ArtistInfoSectionRenderer.icons.crownSvg,
-        bg: "#264b61bf",
-      },
-      base: {
-        text: "Based",
-        icon: ArtistInfoSectionRenderer.icons.starSvg,
-        bg: "#553995bf",
-      },
-      approved: {
-        text: "You can listen",
-        icon: ArtistInfoSectionRenderer.icons.thumbsUpSvg,
-        bg: "#23593ebf",
-      },
-      warning: {
-        text: "Be careful",
-        icon: ArtistInfoSectionRenderer.icons.warningSvg,
-        bg: "#77471ebf",
-      },
-      blocked: {
-        text: "Don't listen",
-        icon: ArtistInfoSectionRenderer.icons.banSvg,
-        bg: "#723433bf",
-      },
-      unknown: {
-        text: "Origin not confirmed",
-        icon: ArtistInfoSectionRenderer.icons.unknownSvg,
-        bg: "#2f2f2fbf",
-      },
-      noInfo: {
-        text: "No artist info",
-        icon: ArtistInfoSectionRenderer.icons.unknownSvg,
-        bg: "#2f2f2fbf",
-      },
-    };
-
-    const badgeData = badges[type] ?? badges.noInfo;
+    const badgeData =
+      ArtistInfoSectionRenderer.badges[type] ??
+      ArtistInfoSectionRenderer.badges.noInfo;
 
     const badge = document.createElement("span");
     badge.classList.add("uafy-trust-badge");
@@ -479,7 +482,7 @@ class ArtistInfoSectionRenderer {
       alignItems: "center",
       padding: "6px 10px",
       borderRadius: "6px",
-      background: badgeData.bg,
+      background: `color-mix(in srgb, ${badgeData.bg} 75%, transparent)`,
       color: "#ffffff",
       fontSize: "1rem",
       lineHeight: "1",
@@ -701,6 +704,43 @@ class SettingsMenu {
     ReactDOM.render(React.createElement(SettingsMenu.Component), container);
   }
 
+  static async applyRuntimeSettings(settings) {
+    if (!settings.popupEnabled) {
+      SkipToastRenderer.clearAll();
+    }
+
+    if (!settings.formatNowPlayingBar) {
+      NowPlayingThemeOverlayRenderer.clear();
+    } else {
+      NowPlayingThemeOverlayRenderer.applyFromLabels(
+        NowPlayingRuntimeState.trustLabels,
+      );
+    }
+
+    const track = NowPlayingRuntimeState.track;
+    const trackArtists = NowPlayingRuntimeState.trackArtists;
+    const trustLabels = NowPlayingRuntimeState.trustLabels;
+
+    if (!track || !trackArtists.length || !trustLabels.length) return;
+
+    const skipReasons = getSkipReasons(trustLabels);
+
+    NowPlayingRuntimeState.skipReasons = skipReasons;
+
+    if (!shouldSkipTrack(track, skipReasons)) return;
+
+    await LocalStorageManager.addSkippedTrack({
+      id: track.uri.split(":")[2],
+      name: track.name,
+      artists: trackArtists.map((artist) => artist.id),
+      reasons: skipReasons,
+    });
+
+    SkipToastRenderer.show(track, trackArtists, skipReasons);
+
+    Spicetify.Player.next();
+  }
+
   static Component() {
     const React = Spicetify.React;
 
@@ -709,14 +749,16 @@ class SettingsMenu {
     });
 
     const saveSettings = async (newSettings) => {
-      setSettings((currentSettings) => {
-        return {
-          ...currentSettings,
-          ...newSettings,
-        };
-      });
+      const updatedSettings = {
+        ...settings,
+        ...newSettings,
+      };
+
+      setSettings(updatedSettings);
 
       await LocalStorageManager.updateSettings(newSettings);
+
+      SettingsMenu.applyRuntimeSettings(updatedSettings);
     };
 
     const resetSettings = async () => {
@@ -724,8 +766,21 @@ class SettingsMenu {
 
       setSettings(defaultSettings);
 
+      SettingsMenu.applyRuntimeSettings(defaultSettings);
+
       Spicetify.showNotification("UAfy settings have been reset");
     };
+
+    const skipStatusSwitchesEnabled =
+      settings.skipBlockedArtists ||
+      settings.skipWarningArtists ||
+      settings.skipUnknownArtists;
+
+    const skipMainSwitchEnabled =
+      settings.skipEnabled && skipStatusSwitchesEnabled;
+
+    const skipSubSwitchesDisabled =
+      !settings.skipEnabled && skipStatusSwitchesEnabled;
 
     return React.createElement(
       "div",
@@ -766,7 +821,8 @@ class SettingsMenu {
         label: "Skip tracks",
         description:
           "Automatically skip tracks based on the selected status filters.",
-        value: settings.skipEnabled,
+        value: skipMainSwitchEnabled,
+        disabled: !skipStatusSwitchesEnabled,
         onChange: (value) => {
           saveSettings({
             skipEnabled: value,
@@ -782,6 +838,7 @@ class SettingsMenu {
         label: "Blocked",
         description: "Skip artists marked as blocked.",
         value: settings.skipBlockedArtists,
+        disabled: skipSubSwitchesDisabled,
         onChange: (value) => {
           saveSettings({
             skipBlockedArtists: value,
@@ -793,6 +850,7 @@ class SettingsMenu {
         label: "Warning",
         description: "Skip artists marked as warning.",
         value: settings.skipWarningArtists,
+        disabled: skipSubSwitchesDisabled,
         onChange: (value) => {
           saveSettings({
             skipWarningArtists: value,
@@ -804,9 +862,29 @@ class SettingsMenu {
         label: "Unknown",
         description: "Skip artists with unknown origin or status.",
         value: settings.skipUnknownArtists,
+        disabled: skipSubSwitchesDisabled,
         onChange: (value) => {
           saveSettings({
             skipUnknownArtists: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.SubSectionTitle, {
+        title: "SReplay behavior",
+      }),
+
+      // TODO: replace this setting with track distributor skip check instead
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Allow replaying skipped tracks",
+        description:
+          "If a track was already skipped by UAfy, it will be allowed to play when you manually return to it or start it yourself.",
+        value: settings.allowSkippedTracksReplay,
+        disabled: !settings.skipEnabled,
+        onChange: (value) => {
+          saveSettings({
+            allowSkippedTracksReplay: value,
           });
         },
       }),
@@ -876,6 +954,7 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.NumberRow, {
+        //TODO: remove local history of skipped tracks completely
         label: "Skipped tracks limit",
         description: "Maximum number of skipped tracks saved in history.",
         value: settings.skippedTracksLimit,
@@ -922,14 +1001,14 @@ class SettingsMenu {
     );
   }
 
-  static ToggleRow({ label, description, value, onChange }) {
+  static ToggleRow({ label, description, value, disabled = false, onChange }) {
     const React = Spicetify.React;
     const Toggle = Spicetify.ReactComponent.Toggle;
 
     return React.createElement(
       "div",
       {
-        className: "uafy-settings-row",
+        className: `uafy-settings-row${disabled ? " is-disabled" : ""}`,
       },
 
       React.createElement(SettingsMenu.RowText, {
@@ -941,7 +1020,11 @@ class SettingsMenu {
         value,
         checked: value,
         isChecked: value,
+        disabled,
+        isDisabled: disabled,
         onSelected: () => {
+          if (disabled) return;
+
           onChange(!value);
         },
       }),
@@ -1149,6 +1232,16 @@ class SettingsMenu {
         min-height: 42px;
       }
 
+      .uafy-settings-row.is-disabled {
+        opacity: 0.45;
+      }
+
+      .uafy-settings-row.is-disabled [role="switch"],
+      .uafy-settings-row.is-disabled button {
+        pointer-events: none;
+        filter: grayscale(1);
+      }
+
       .uafy-settings-text-wrapper {
         display: flex;
         flex-direction: column;
@@ -1211,7 +1304,8 @@ class SettingsMenu {
 class SkipToastRenderer {
   static styleElementId = "uafy-skip-toast-style";
   static containerClassName = "uafy-skip-toast-container";
-  static toastDurationMs = 6000;
+  static toastDurationMs = 10000;
+  static visibleToastLimit = 3;
 
   static async show(track, trackArtists, skipReasons) {
     const settings = LocalStorageManager.getSettings();
@@ -1231,7 +1325,11 @@ class SkipToastRenderer {
       dominantColor,
     );
 
+    SkipToastRenderer.removeExtraToastsBeforeAppend(container);
+
     container.appendChild(toast);
+
+    SkipToastRenderer.updateToastStack(container);
 
     requestAnimationFrame(() => {
       toast.classList.add("is-visible");
@@ -1240,6 +1338,29 @@ class SkipToastRenderer {
     setTimeout(() => {
       SkipToastRenderer.removeToast(toast);
     }, SkipToastRenderer.toastDurationMs);
+  }
+
+  static removeExtraToastsBeforeAppend(container) {
+    const maxToastCount = SkipToastRenderer.visibleToastLimit + 1;
+    const toasts = Array.from(container.querySelectorAll(".uafy-skip-toast"));
+
+    while (toasts.length >= maxToastCount) {
+      const oldestToast = toasts.shift();
+
+      SkipToastRenderer.removeToast(oldestToast, false);
+    }
+  }
+
+  static updateToastStack(container) {
+    const toasts = Array.from(container.querySelectorAll(".uafy-skip-toast"));
+
+    toasts.forEach((toast) => {
+      toast.classList.remove("is-fading-away");
+    });
+
+    if (toasts.length > SkipToastRenderer.visibleToastLimit) {
+      toasts[0].classList.add("is-fading-away");
+    }
   }
 
   static async getDominantColorFromTrack(track) {
@@ -1462,7 +1583,7 @@ class SkipToastRenderer {
     artistName.textContent = artist?.name || "Unknown artist";
 
     if (artist?.id) {
-      artistName.addEventListener("click", () => {
+      artistName.addEventListener("click", (event) => {
         event.stopPropagation();
         Spicetify.Platform.History.push(`/artist/${artist.id}`);
       });
@@ -1485,21 +1606,49 @@ class SkipToastRenderer {
     return row;
   }
 
-  static removeToast(toast) {
+  static removeToast(toast, animate = true) {
+    if (!toast || toast.classList.contains("is-removing")) return;
+
+    const container = toast.closest(`.${SkipToastRenderer.containerClassName}`);
+
+    if (!animate) {
+      toast.remove();
+
+      if (container?.children.length) {
+        SkipToastRenderer.updateToastStack(container);
+      } else {
+        container?.remove();
+      }
+
+      return;
+    }
+
     toast.classList.remove("is-visible");
     toast.classList.add("is-removing");
 
     setTimeout(() => {
-      const container = toast.closest(
-        `.${SkipToastRenderer.containerClassName}`,
-      );
-
       toast.remove();
 
-      if (container && !container.children.length) {
-        container.remove();
+      if (container?.children.length) {
+        SkipToastRenderer.updateToastStack(container);
+      } else {
+        container?.remove();
       }
     }, 200);
+  }
+
+  static clearAll() {
+    const container = document.querySelector(
+      `.${SkipToastRenderer.containerClassName}`,
+    );
+
+    if (!container) return;
+
+    container.querySelectorAll(".uafy-skip-toast").forEach((toast) => {
+      SkipToastRenderer.removeToast(toast, false);
+    });
+
+    container.remove();
   }
 
   static injectStyles() {
@@ -1513,7 +1662,6 @@ class SkipToastRenderer {
         position: fixed;
         right: 24px;
         bottom: 112px;
-        z-index: 999999;
         display: flex;
         flex-direction: column;
         gap: 12px;
@@ -1549,6 +1697,27 @@ class SkipToastRenderer {
       .uafy-skip-toast.is-removing {
         opacity: 0;
         transform: translateY(12px) scale(0.98);
+      }
+
+      .uafy-skip-toast.is-fading-away {
+        -webkit-mask-image: linear-gradient(
+          to bottom,
+          transparent 0%,
+          transparent 32%,
+          rgba(0, 0, 0, 0.28) 45%,
+          rgba(0, 0, 0, 0.7) 58%,
+          black 68%,
+          black 100%
+        );
+        mask-image: linear-gradient(
+          to bottom,
+          transparent 0%,
+          transparent 32%,
+          rgba(0, 0, 0, 0.28) 45%,
+          rgba(0, 0, 0, 0.7) 58%,
+          black 68%,
+          black 100%
+        );
       }
 
       .uafy-skip-toast-header {
@@ -1654,6 +1823,152 @@ class SkipToastRenderer {
   }
 }
 
+class NowPlayingRuntimeState {
+  static track = null;
+  static trackArtists = [];
+  static trustLabels = [];
+  static skipReasons = [];
+
+  static update(track, trackArtists, trustLabels, skipReasons) {
+    NowPlayingRuntimeState.track = track;
+    NowPlayingRuntimeState.trackArtists = trackArtists;
+    NowPlayingRuntimeState.trustLabels = trustLabels;
+    NowPlayingRuntimeState.skipReasons = skipReasons;
+  }
+}
+
+class NowPlayingThemeOverlayRenderer {
+  static styleElementId = "uafy-now-playing-theme-overlay-style";
+  static overlayElementId = "uafy-now-playing-theme-overlay";
+
+  static priority = [
+    "blocked",
+    "warning", // TODO: delete and implement in-depth track distributor check
+    "unknown",
+    "pride",
+    "base",
+    "approved",
+    "noInfo",
+  ];
+
+  static applyFromLabels(labels = []) {
+    const settings = LocalStorageManager.getSettings();
+
+    if (!settings.formatNowPlayingBar) {
+      NowPlayingThemeOverlayRenderer.clear();
+      return;
+    }
+
+    const themeStatus = NowPlayingThemeOverlayRenderer.getThemeStatus(labels);
+
+    if (!themeStatus) {
+      NowPlayingThemeOverlayRenderer.clear();
+      return;
+    }
+
+    NowPlayingThemeOverlayRenderer.apply(themeStatus);
+  }
+
+  static getThemeStatus(labels = []) {
+    const normalizedLabels = labels
+      .map((label) => {
+        return label.label || "";
+      })
+      .filter(Boolean);
+
+    return (
+      NowPlayingThemeOverlayRenderer.priority.find((status) => {
+        return normalizedLabels.includes(status);
+      }) || null
+    );
+  }
+
+  static apply(themeStatus) {
+    const nowPlayingBar = NowPlayingThemeOverlayRenderer.getNowPlayingBar();
+    const themeColor = ArtistInfoSectionRenderer.badges[themeStatus].bg;
+
+    if (!nowPlayingBar || !themeColor) return;
+
+    NowPlayingThemeOverlayRenderer.injectStyles();
+
+    let overlay = nowPlayingBar.querySelector(
+      `#${NowPlayingThemeOverlayRenderer.overlayElementId}`,
+    );
+
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = NowPlayingThemeOverlayRenderer.overlayElementId;
+      overlay.setAttribute("aria-hidden", "true");
+
+      nowPlayingBar.prepend(overlay);
+    }
+
+    overlay.dataset.status = themeStatus;
+    overlay.style.setProperty("--uafy-now-playing-color", themeColor);
+  }
+
+  static clear() {
+    document
+      .getElementById(NowPlayingThemeOverlayRenderer.overlayElementId)
+      ?.remove();
+  }
+
+  static getNowPlayingBar() {
+    return document.querySelector("div.Root__now-playing-bar");
+  }
+
+  static injectStyles() {
+    if (
+      document.getElementById(NowPlayingThemeOverlayRenderer.styleElementId)
+    ) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = NowPlayingThemeOverlayRenderer.styleElementId;
+
+    style.textContent = `
+      .Root__now-playing-bar {
+        position: relative;
+        isolation: isolate;
+        overflow: hidden;
+      }
+
+      .Root__now-playing-bar #uafy-now-playing-theme-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: 0.82;
+        mix-blend-mode: screen;
+        contain: strict;
+        background:
+          radial-gradient(circle at left center, color-mix(in srgb, var(--uafy-now-playing-color) 95%, transparent) 0%, color-mix(in srgb, var(--uafy-now-playing-color) 75%, transparent) 8%, transparent 22%),
+          radial-gradient(circle at right center, color-mix(in srgb, var(--uafy-now-playing-color) 95%, transparent) 0%, color-mix(in srgb, var(--uafy-now-playing-color) 75%, transparent) 8%, transparent 22%),
+          linear-gradient(90deg, color-mix(in srgb, var(--uafy-now-playing-color) 45%, transparent) 0%, transparent 28%, transparent 72%, color-mix(in srgb, var(--uafy-now-playing-color) 45%, transparent) 100%);
+      }
+
+      .Root__now-playing-bar > :not(#uafy-now-playing-theme-overlay) {
+        position: relative;
+        z-index: 1;
+      }
+
+      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="approved"],
+      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="pride"],
+      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="base"] {
+        opacity: 0.68;
+      }
+
+      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="unknown"],
+      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="noInfo"] {
+        opacity: 0.58;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+}
+
 async function loadArtistPage(location = Spicetify.Platform.History.location) {
   const pageType = location.pathname.split("/")[1];
   const artistId = location.pathname.split("/")[2];
@@ -1706,21 +2021,55 @@ async function getTrackArtists(track) {
   );
 }
 
-function getBlockedTrackLabels(trackArtists) {
-  const blockedLabels = ["blocked", "unknown", "warning"];
-
+function getTrackTrustLabels(trackArtists) {
   return trackArtists.flatMap((artist) => {
-    return artist.labels
-      .map((label) => label.toLowerCase())
-      .filter((label) => blockedLabels.includes(label))
-      .map((label) => {
-        return {
-          artistId: artist.id,
-          artistName: artist.name, //TODO: remove in future
-          label,
-        };
-      });
+    const labels = artist.labels.length ? artist.labels : ["noInfo"];
+
+    return labels.map((label) => {
+      return {
+        artistId: artist.id,
+        artistName: artist.name, //TODO: remove in future
+        label: label,
+      };
+    });
   });
+}
+
+function getSkipReasons(trustLabels) {
+  const settings = LocalStorageManager.getSettings();
+
+  const skipLabelSettings = {
+    blocked: settings.skipBlockedArtists,
+    warning: settings.skipWarningArtists,
+    unknown: settings.skipUnknownArtists,
+  };
+
+  return trustLabels.filter((reason) => {
+    return Boolean(skipLabelSettings[reason.label]);
+  });
+}
+
+function wasTrackAlreadySkipped(track) {
+  const trackId = track?.uri?.split(":")?.[2];
+
+  if (!trackId) return false;
+
+  return LocalStorageManager.getSkippedTracks().some((skippedTrack) => {
+    return skippedTrack.id === trackId;
+  });
+}
+
+function shouldSkipTrack(track, skipReasons) {
+  const settings = LocalStorageManager.getSettings();
+
+  if (!skipReasons.length) return false;
+  if (!settings.skipEnabled) return false;
+
+  if (settings.allowSkippedTracksReplay && wasTrackAlreadySkipped(track)) {
+    return false;
+  }
+
+  return true;
 }
 
 async function loadNowPlayingArtistFlags(timeoutMs = 5000) {
@@ -1747,22 +2096,26 @@ async function loadNowPlayingArtistFlags(timeoutMs = 5000) {
     return;
   }
 
-  const blockedTrackLabels = getBlockedTrackLabels(trackArtists);
+  const trustLabels = getTrackTrustLabels(trackArtists);
+  const skipReasons = getSkipReasons(trustLabels);
 
-  if (blockedTrackLabels.length) {
+  NowPlayingRuntimeState.update(track, trackArtists, trustLabels, skipReasons);
+
+  if (shouldSkipTrack(track, skipReasons)) {
     await LocalStorageManager.addSkippedTrack({
       id: track.uri.split(":")[2],
       name: track.name,
       artists: trackArtists.map((artist) => artist.id),
-      reasons: blockedTrackLabels,
+      reasons: skipReasons,
     });
 
-    SkipToastRenderer.show(track, trackArtists, blockedTrackLabels);
+    SkipToastRenderer.show(track, trackArtists, skipReasons);
 
     Spicetify.Player.next();
     return;
   }
 
+  NowPlayingThemeOverlayRenderer.applyFromLabels(trustLabels);
   addFlagsToArtistSpans(artistSpans.bottomBarArtistSpans, trackArtists);
   addFlagsToArtistSpans(artistSpans.sideViewArtistSpans, trackArtists);
 }
