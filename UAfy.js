@@ -76,11 +76,15 @@ class LocalStorageManager {
       skipUnknownArtists: false,
 
       popupEnabled: true,
-      popupDurationMs: 10000,
+      popupDurationMs: 3500,
       visibleToastLimit: 3,
 
       emojiFlags: true,
       formatNowPlayingBar: true,
+
+      formatNowPlayingArtistName: true,
+      showNowPlayingArtistStatusShape: true,
+      showNowPlayingArtistFlags: true,
 
       artistCacheLimit: 150,
     },
@@ -307,7 +311,7 @@ class Artist {
     const cachedArtistData = LocalStorageManager.getArtist(artistId);
 
     if (cachedArtistData) {
-      console.log("Loading artist from local storage " + artistId);
+      console.log("Loading artist from local storage", artistId);
 
       const updatedArtistData =
         await LocalStorageManager.markArtistUsed(artistId);
@@ -327,7 +331,7 @@ class Artist {
     const artistURL = Artist.baseArtistURL + artistId;
     const requestURL = Artist.apiURL + encodeURIComponent(artistURL);
 
-    console.log("Requesting artist " + artistId);
+    console.log("Requesting artist from db", artistId);
 
     const responseData = await Spicetify.CosmosAsync.get(requestURL);
 
@@ -351,7 +355,18 @@ class Artist {
       countries: (artistItem.countries || []).map((countryData) => {
         const countryInfo = countryData.originalName?.split(" ") || [];
 
-        return new Country(countryInfo[1], countryInfo[0]);
+        const countryEmoji = countryInfo[0];
+        const countryName = countryInfo.slice(1).join(" ");
+
+        if (countryName === "ruzzia") {
+          return new Country("russia", "🇷🇺");
+        }
+
+        if (countryName === "belarus") {
+          return new Country("belarus", "🇧🇾");
+        }
+
+        return new Country(countryName, countryEmoji);
       }),
 
       labels: (artistItem.listenLabels || []).map((labelData) => {
@@ -495,10 +510,10 @@ class UafyTrack {
 
     const priority = [
       "blocked",
-      "unknown",
       "pride",
       "base",
       "approved",
+      "unknown",
       "noInfo",
     ];
 
@@ -1038,18 +1053,30 @@ class SettingsMenu {
       return;
     }
 
-    if (!settings.formatNowPlayingBar) {
-      NowPlayingThemeOverlayRenderer.clear();
-    } else {
-      NowPlayingThemeOverlayRenderer.applyFromTrack(track);
+    const nowPlayingSettingsChanged =
+      Object.hasOwn(changedSettings, "formatNowPlayingBar") ||
+      Object.hasOwn(changedSettings, "formatNowPlayingArtistName") ||
+      Object.hasOwn(changedSettings, "showNowPlayingArtistStatusShape") ||
+      Object.hasOwn(changedSettings, "showNowPlayingArtistFlags") ||
+      emojiFlagsChanged;
+
+    if (nowPlayingSettingsChanged) {
+      const artistSpans = NowPlayingRuntimeState.artistSpans;
+
+      if (artistSpans) {
+        renderNowPlayingTrack(track, artistSpans);
+      } else if (!settings.formatNowPlayingBar) {
+        NowPlayingThemeOverlayRenderer.clear();
+      } else {
+        NowPlayingThemeOverlayRenderer.applyFromTrack(track);
+      }
     }
 
     if (emojiFlagsChanged) {
       const artistSpans = NowPlayingRuntimeState.artistSpans;
 
       if (artistSpans) {
-        addFlagsToArtistSpans(artistSpans.bottomBarArtistSpans, track.artists);
-        addFlagsToArtistSpans(artistSpans.sideViewArtistSpans, track.artists);
+        NowPlayingArtistRenderer.render(track, artistSpans);
       }
 
       refreshCurrentArtistPageFlags().catch((error) => {
@@ -1263,13 +1290,48 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Format now playing bar",
+        label: "Highlight now playing bar",
         description:
-          "Highlight the now playing bar when one of the artists has a warning, blocked, or unknown label.",
+          "Color the now playing bar based on the strongest artist status on the current track.",
         value: settings.formatNowPlayingBar,
         onChange: (value) => {
           saveSettings({
             formatNowPlayingBar: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Format artist names",
+        description:
+          "Color artist names in now playing when the artist exists in the UAfy database.",
+        value: settings.formatNowPlayingArtistName,
+        onChange: (value) => {
+          saveSettings({
+            formatNowPlayingArtistName: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Show status shapes",
+        description:
+          "Show a small shape next to each artist name: blocked square, warning triangle, approved circle, etc.",
+        value: settings.showNowPlayingArtistStatusShape,
+        onChange: (value) => {
+          saveSettings({
+            showNowPlayingArtistStatusShape: value,
+          });
+        },
+      }),
+
+      React.createElement(SettingsMenu.ToggleRow, {
+        label: "Show artist flags",
+        description: "Show country flags next to artist names in now playing.",
+        value: settings.showNowPlayingArtistFlags,
+        onChange: (value) => {
+          saveSettings({
+            showNowPlayingArtistFlags: value,
           });
         },
       }),
@@ -2233,6 +2295,216 @@ class NowPlayingThemeOverlayRenderer {
   }
 }
 
+class NowPlayingArtistRenderer {
+  static styleElementId = "uafy-now-playing-artist-style";
+
+  static labelPriority = [
+    "blocked",
+    "warning",
+    "unknown",
+    "pride",
+    "base",
+    "approved",
+    "noInfo",
+  ];
+
+  static statusStyles = {
+    blocked: {
+      color: "#ff4d4d",
+      shape: "square",
+    },
+    warning: {
+      color: "#f5c542",
+      shape: "triangle",
+    },
+    approved: {
+      color: "#1ed760",
+      shape: "circle",
+    },
+    pride: {
+      color: "#4aa3df",
+      shape: "circle",
+    },
+    base: {
+      color: "#8f6cff",
+      shape: "circle",
+    },
+    unknown: {
+      color: "#b3b3b3",
+      shape: "circle",
+    },
+    noInfo: {
+      color: "#8a8a8a",
+      shape: "circle",
+    },
+  };
+
+  static render(uafyTrack, artistSpans) {
+    const settings = LocalStorageManager.getSettings();
+
+    NowPlayingArtistRenderer.injectStyles();
+
+    NowPlayingArtistRenderer.renderArtistSpanGroup(
+      artistSpans.bottomBarArtistSpans,
+      uafyTrack.artists,
+      settings,
+    );
+
+    NowPlayingArtistRenderer.renderArtistSpanGroup(
+      artistSpans.sideViewArtistSpans,
+      uafyTrack.artists,
+      settings,
+    );
+  }
+
+  static renderArtistSpanGroup(artistSpansById, artists, settings) {
+    Object.entries(artistSpansById).forEach(([artistId, artistSpan]) => {
+      const artist = artists.find((trackArtist) => {
+        return trackArtist.id === artistId;
+      });
+
+      NowPlayingArtistRenderer.resetArtistSpan(artistSpan);
+
+      if (!artist) return;
+
+      const dominantLabel =
+        NowPlayingArtistRenderer.getDominantArtistLabel(artist);
+
+      const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
+
+      const artistLink = artistSpan.querySelector("a") || artistSpan;
+
+      const artistExistsInDatabase = Boolean(artist.name);
+
+      if (
+        settings.formatNowPlayingArtistName &&
+        artistExistsInDatabase &&
+        statusStyle?.color
+      ) {
+        artistLink.classList.add("uafy-now-playing-artist-name");
+        artistLink.style.setProperty(
+          "--uafy-artist-status-color",
+          statusStyle.color,
+        );
+      }
+
+      if (
+        settings.showNowPlayingArtistStatusShape &&
+        artistExistsInDatabase &&
+        statusStyle
+      ) {
+        artistSpan.appendChild(
+          NowPlayingArtistRenderer.createStatusShape(dominantLabel),
+        );
+      }
+
+      if (settings.showNowPlayingArtistFlags && artist.countries.length) {
+        artist.countries.forEach((country) => {
+          const flagElement = country.flagImg(settings.emojiFlags, 4, 12, 16);
+
+          flagElement.classList.add("uafy-artist-flag");
+
+          artistSpan.appendChild(flagElement);
+        });
+      }
+    });
+  }
+
+  static resetArtistSpan(artistSpan) {
+    artistSpan.querySelectorAll(".uafy-artist-flag").forEach((flag) => {
+      flag.remove();
+    });
+
+    artistSpan
+      .querySelectorAll(".uafy-artist-status-shape")
+      .forEach((shape) => {
+        shape.remove();
+      });
+
+    const artistLink = artistSpan.querySelector("a") || artistSpan;
+
+    artistLink.classList.remove("uafy-now-playing-artist-name");
+    artistLink.style.removeProperty("--uafy-artist-status-color");
+  }
+
+  static getDominantArtistLabel(artist) {
+    const labels = artist.labels.length ? artist.labels : ["noInfo"];
+
+    return (
+      NowPlayingArtistRenderer.labelPriority.find((label) => {
+        return labels.includes(label);
+      }) || "noInfo"
+    );
+  }
+
+  static createStatusShape(label) {
+    const statusStyle =
+      NowPlayingArtistRenderer.statusStyles[label] ||
+      NowPlayingArtistRenderer.statusStyles.noInfo;
+
+    const shape = document.createElement("span");
+
+    shape.classList.add("uafy-artist-status-shape");
+    shape.dataset.status = label;
+    shape.dataset.shape = statusStyle.shape;
+    shape.style.setProperty("--uafy-artist-status-color", statusStyle.color);
+
+    return shape;
+  }
+
+  static injectStyles() {
+    if (document.getElementById(NowPlayingArtistRenderer.styleElementId)) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = NowPlayingArtistRenderer.styleElementId;
+
+    style.textContent = `
+      .uafy-now-playing-artist-name {
+        color: var(--uafy-artist-status-color) !important;
+      }
+
+      .uafy-artist-flag{
+        margin-bottom: 2px
+      }
+
+      .uafy-artist-status-shape {
+        display: inline-block;
+        margin-left: 4px;
+        vertical-align: middle;
+        flex: 0 0 auto;
+      }
+
+      .uafy-artist-status-shape[data-shape="square"] {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        background: var(--uafy-artist-status-color);
+      }
+
+      .uafy-artist-status-shape[data-shape="circle"] {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--uafy-artist-status-color);
+        margin-bottom: 3px;
+      }
+        
+      .uafy-artist-status-shape[data-shape="triangle"] {
+        width: 0;
+        height: 0;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-bottom: 10px solid var(--uafy-artist-status-color);
+        margin-bottom: 4px;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+}
+
 async function loadArtistPage(location = Spicetify.Platform.History.location) {
   const pageType = location.pathname.split("/")[1];
   const artistId = location.pathname.split("/")[2];
@@ -2294,10 +2566,30 @@ async function getTrackArtists(track) {
   );
 }
 
-async function loadNowPlayingArtistFlags(timeoutMs = 5000) {
+async function handleNowPlayingTrackChange(timeoutMs = 5000) {
   NowPlayingThemeOverlayRenderer.clear();
 
-  const track = await DomObserver.waitUntil(() => {
+  const spotifyTrack = await waitForCurrentSpotifyTrack(timeoutMs);
+  const currentTrackUri = spotifyTrack.uri;
+
+  const { uafyTrack, artistSpans } =
+    await buildNowPlayingTrackContext(spotifyTrack);
+
+  if (!isStillCurrentTrack(currentTrackUri)) {
+    return;
+  }
+
+  NowPlayingRuntimeState.update(uafyTrack, artistSpans);
+
+  if (handleTrackSkipIfNeeded(uafyTrack)) {
+    return;
+  }
+
+  renderNowPlayingTrack(uafyTrack, artistSpans);
+}
+
+async function waitForCurrentSpotifyTrack(timeoutMs = 5000) {
+  return DomObserver.waitUntil(() => {
     const track = Spicetify.Player.data?.item;
 
     if (!track?.uri) return null;
@@ -2305,13 +2597,13 @@ async function loadNowPlayingArtistFlags(timeoutMs = 5000) {
 
     return track;
   }, timeoutMs);
+}
 
-  const currentTrackUri = track.uri;
-
-  const trackArtistsPromise = getTrackArtists(track);
-  const artistSpansPromise = DomObserver.waitForNowPlayingArtist(track);
-
-  const distributorsPromise = UafyTrack.getDistributorsFromSpotifyTrack(track);
+async function buildNowPlayingTrackContext(spotifyTrack) {
+  const trackArtistsPromise = getTrackArtists(spotifyTrack);
+  const artistSpansPromise = DomObserver.waitForNowPlayingArtist(spotifyTrack);
+  const distributorsPromise =
+    UafyTrack.getDistributorsFromSpotifyTrack(spotifyTrack);
 
   const [trackArtists, artistSpans, distributors] = await Promise.all([
     trackArtistsPromise,
@@ -2319,48 +2611,30 @@ async function loadNowPlayingArtistFlags(timeoutMs = 5000) {
     distributorsPromise,
   ]);
 
-  if (Spicetify.Player.data?.item?.uri !== currentTrackUri) {
-    return;
-  }
-
-  const uafyTrack = new UafyTrack(track, trackArtists, distributors);
-
-  NowPlayingRuntimeState.update(uafyTrack, artistSpans);
-
-  if (uafyTrack.shouldSkipTrack()) {
-    SkipToastRenderer.show(uafyTrack);
-
-    Spicetify.Player.next();
-    return;
-  }
-
-  NowPlayingThemeOverlayRenderer.applyFromTrack(uafyTrack);
-  addFlagsToArtistSpans(artistSpans.bottomBarArtistSpans, uafyTrack.artists);
-  addFlagsToArtistSpans(artistSpans.sideViewArtistSpans, uafyTrack.artists);
+  return {
+    uafyTrack: new UafyTrack(spotifyTrack, trackArtists, distributors),
+    artistSpans,
+  };
 }
 
-function addFlagsToArtistSpans(artistSpansById, trackArtists) {
-  const settings = LocalStorageManager.getSettings();
+function isStillCurrentTrack(trackUri) {
+  return Spicetify.Player.data?.item?.uri === trackUri;
+}
 
-  Object.entries(artistSpansById).forEach(([artistId, artistSpan]) => {
-    const artist = trackArtists.find((trackArtist) => {
-      return trackArtist.id === artistId;
-    });
+function handleTrackSkipIfNeeded(uafyTrack) {
+  if (!uafyTrack.shouldSkipTrack()) {
+    return false;
+  }
 
-    artistSpan.querySelectorAll(".uafy-artist-flag").forEach((flag) => {
-      flag.remove();
-    });
+  SkipToastRenderer.show(uafyTrack);
+  Spicetify.Player.next();
 
-    if (!artist?.countries?.length) return;
+  return true;
+}
 
-    artist.countries.forEach((country) => {
-      const flagElement = country.flagImg(settings.emojiFlags, 4, 12, 16);
-
-      flagElement.classList.add("uafy-artist-flag");
-
-      artistSpan.appendChild(flagElement);
-    });
-  });
+function renderNowPlayingTrack(uafyTrack, artistSpans) {
+  NowPlayingThemeOverlayRenderer.applyFromTrack(uafyTrack);
+  NowPlayingArtistRenderer.render(uafyTrack, artistSpans);
 }
 
 async function startup() {
@@ -2368,7 +2642,7 @@ async function startup() {
 
   const startupResults = await Promise.allSettled([
     loadArtistPage(),
-    loadNowPlayingArtistFlags(),
+    handleNowPlayingTrackChange(),
   ]);
 
   startupResults.forEach((result) => {
@@ -2384,7 +2658,7 @@ function main() {
   });
 
   Spicetify.Player.addEventListener("songchange", () => {
-    loadNowPlayingArtistFlags().catch((error) => {
+    handleNowPlayingTrackChange().catch((error) => {
       console.error("UAfy failed to update now playing flags:", error);
     });
   });
