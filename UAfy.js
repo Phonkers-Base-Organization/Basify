@@ -1073,12 +1073,6 @@ class SettingsMenu {
     }
 
     if (emojiFlagsChanged) {
-      const artistSpans = NowPlayingRuntimeState.artistSpans;
-
-      if (artistSpans) {
-        NowPlayingArtistRenderer.render(track, artistSpans);
-      }
-
       refreshCurrentArtistPageFlags().catch((error) => {
         console.warn("UAfy failed to refresh artist page flags:", error);
       });
@@ -1138,6 +1132,8 @@ class SettingsMenu {
 
     const skipSubSwitchesDisabled =
       !settings.skipEnabled && skipStatusSwitchesEnabled;
+
+    const popupSubSettingsDisabled = !settings.popupEnabled;
 
     return React.createElement(
       "div",
@@ -1249,6 +1245,7 @@ class SettingsMenu {
         value: settings.popupDurationMs,
         min: 1000,
         max: 60000,
+        disabled: popupSubSettingsDisabled,
         onChange: (value) => {
           saveSettings({
             popupDurationMs: value,
@@ -1262,6 +1259,7 @@ class SettingsMenu {
         value: settings.visibleToastLimit,
         min: 1,
         max: 10,
+        disabled: popupSubSettingsDisabled,
         onChange: (value) => {
           saveSettings({
             visibleToastLimit: value,
@@ -1454,7 +1452,15 @@ class SettingsMenu {
     );
   }
 
-  static NumberRow({ label, description, value, min, max, onChange }) {
+  static NumberRow({
+    label,
+    description,
+    value,
+    min,
+    max,
+    disabled = false,
+    onChange,
+  }) {
     const React = Spicetify.React;
 
     const [inputValue, setInputValue] = React.useState(String(value));
@@ -1464,6 +1470,8 @@ class SettingsMenu {
     }, [value]);
 
     const saveValue = () => {
+      if (disabled) return;
+
       const numberValue = Number(inputValue);
 
       if (!Number.isFinite(numberValue)) {
@@ -1483,7 +1491,7 @@ class SettingsMenu {
     return React.createElement(
       "div",
       {
-        className: "uafy-settings-row",
+        className: `uafy-settings-row${disabled ? " is-disabled" : ""}`,
       },
 
       React.createElement(SettingsMenu.RowText, {
@@ -1497,13 +1505,18 @@ class SettingsMenu {
         min,
         max,
         value: inputValue,
+        disabled,
         onChange: (event) => {
+          if (disabled) return;
+
           setInputValue(event.target.value);
         },
         onBlur: () => {
           saveValue();
         },
         onKeyDown: (event) => {
+          if (disabled) return;
+
           if (event.key === "Enter") {
             event.currentTarget.blur();
           }
@@ -1702,18 +1715,16 @@ class SkipToastRenderer {
 
     const container = SkipToastRenderer.createContainer();
     const toast = SkipToastRenderer.createToast(track, dominantColor);
+    toast.dataset.createdAt = String(Date.now());
 
     SkipToastRenderer.removeExtraToastsBeforeAppend(container);
 
     container.appendChild(toast);
-
     SkipToastRenderer.updateToastStack(container);
 
     requestAnimationFrame(() => {
       toast.classList.add("is-visible");
     });
-
-    toast.dataset.createdAt = String(Date.now());
 
     SkipToastRenderer.scheduleToastRemoval(toast);
   }
@@ -2187,6 +2198,62 @@ class NowPlayingRuntimeState {
   }
 }
 
+class PlaybackDeviceMonitor {
+  static checkIntervalMs = 2000;
+  static intervalId = null;
+  static lastDeviceId = null;
+  static lastPlayingOnCurrentDevice = null;
+
+  static getActiveDevice() {
+    return Spicetify.Platform.ConnectAPI.state.activeDevice ?? null;
+  }
+
+  static isSpotifyPlayingOnCurrentDevice() {
+    const device = PlaybackDeviceMonitor.getActiveDevice();
+
+    return Boolean(device?.isLocal && Spicetify.Player.isPlaying());
+  }
+
+  static check(reason = "Device check") {
+    const device = PlaybackDeviceMonitor.getActiveDevice();
+    const deviceId = device?.id ?? null;
+    const playingOnCurrentDevice =
+      PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice();
+
+    const deviceChanged = deviceId !== PlaybackDeviceMonitor.lastDeviceId;
+    const startedPlayingOnCurrentDevice =
+      playingOnCurrentDevice &&
+      PlaybackDeviceMonitor.lastPlayingOnCurrentDevice === false;
+
+    PlaybackDeviceMonitor.lastDeviceId = deviceId;
+    PlaybackDeviceMonitor.lastPlayingOnCurrentDevice = playingOnCurrentDevice;
+
+    if (deviceChanged) {
+      const deviceLabel = device
+        ? `${device.isLocal ? "local" : "remote"} ${device.type}: ${device.name}`
+        : "No active device";
+
+      console.log(`[UAfy] ${reason}`);
+      console.log("[UAfy] Active device:", deviceLabel);
+      console.log("[UAfy] Playing on current device:", playingOnCurrentDevice);
+    }
+
+    if (startedPlayingOnCurrentDevice) {
+      handleCurrentTrackSkipCheck(reason);
+    }
+  }
+
+  static start() {
+    if (PlaybackDeviceMonitor.intervalId) return;
+
+    PlaybackDeviceMonitor.check("Startup");
+
+    PlaybackDeviceMonitor.intervalId = setInterval(() => {
+      PlaybackDeviceMonitor.check("Device check");
+    }, PlaybackDeviceMonitor.checkIntervalMs);
+  }
+}
+
 class NowPlayingThemeOverlayRenderer {
   static styleElementId = "uafy-now-playing-theme-overlay-style";
   static overlayElementId = "uafy-now-playing-theme-overlay";
@@ -2621,7 +2688,24 @@ function isStillCurrentTrack(trackUri) {
   return Spicetify.Player.data?.item?.uri === trackUri;
 }
 
+function handleCurrentTrackSkipCheck(reason = "Playback state changed") {
+  const track = NowPlayingRuntimeState.track;
+
+  if (track) {
+    handleTrackSkipIfNeeded(track);
+    return;
+  }
+
+  handleNowPlayingTrackChange().catch((error) => {
+    console.error(`UAfy failed to check current track after ${reason}:`, error);
+  });
+}
+
 function handleTrackSkipIfNeeded(uafyTrack) {
+  if (!PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice()) {
+    return false;
+  }
+
   if (!uafyTrack.shouldSkipTrack()) {
     return false;
   }
@@ -2639,6 +2723,7 @@ function renderNowPlayingTrack(uafyTrack, artistSpans) {
 
 async function startup() {
   SettingsMenu.registerButton();
+  PlaybackDeviceMonitor.start();
 
   const startupResults = await Promise.allSettled([
     loadArtistPage(),
@@ -2663,6 +2748,10 @@ function main() {
     });
   });
 
+  Spicetify.Player.addEventListener("onplaypause", () => {
+    handleCurrentTrackSkipCheck("Play/pause changed");
+  });
+
   Spicetify.Platform.History.listen((location) => {
     loadArtistPage(location).catch((error) => {
       console.error("UAfy failed to load artist page:", error);
@@ -2675,6 +2764,8 @@ function main() {
     !Spicetify.Player ||
     !Spicetify.Platform ||
     !Spicetify.Platform.History ||
+    !Spicetify.Platform.ConnectAPI ||
+    !Spicetify.Platform.ConnectAPI.state ||
     !Spicetify.LocalStorage ||
     !Spicetify.CosmosAsync ||
     !Spicetify.Topbar ||
