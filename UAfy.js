@@ -2390,19 +2390,19 @@ class NowPlayingArtistRenderer {
     },
     pride: {
       color: "#4aa3df",
-      shape: "circle",
+      shape: "crown",
     },
     base: {
       color: "#8f6cff",
-      shape: "circle",
+      shape: "star",
     },
     unknown: {
       color: "#b3b3b3",
-      shape: "circle",
+      shape: "world",
     },
     noInfo: {
       color: "#8a8a8a",
-      shape: "circle",
+      shape: "world",
     },
   };
 
@@ -2443,11 +2443,7 @@ class NowPlayingArtistRenderer {
 
       const artistExistsInDatabase = Boolean(artist.name);
 
-      if (
-        settings.formatNowPlayingArtistName &&
-        artistExistsInDatabase &&
-        statusStyle?.color
-      ) {
+      if (settings.formatNowPlayingArtistName && statusStyle?.color) {
         artistLink.classList.add("uafy-now-playing-artist-name");
         artistLink.style.setProperty(
           "--uafy-artist-status-color",
@@ -2455,11 +2451,7 @@ class NowPlayingArtistRenderer {
         );
       }
 
-      if (
-        settings.showNowPlayingArtistStatusShape &&
-        artistExistsInDatabase &&
-        statusStyle
-      ) {
+      if (settings.showNowPlayingArtistStatusShape && statusStyle) {
         artistSpan.appendChild(
           NowPlayingArtistRenderer.createStatusShape(dominantLabel),
         );
@@ -2516,8 +2508,20 @@ class NowPlayingArtistRenderer {
     shape.dataset.shape = statusStyle.shape;
     shape.style.setProperty("--uafy-artist-status-color", statusStyle.color);
 
+    const iconSvg = NowPlayingArtistRenderer.statusIcons[statusStyle.shape];
+
+    if (iconSvg) {
+      shape.innerHTML = iconSvg;
+    }
+
     return shape;
   }
+
+  static statusIcons = {
+    crown: ArtistInfoSectionRenderer.icons.crownSvg,
+    star: ArtistInfoSectionRenderer.icons.starSvg,
+    world: ArtistInfoSectionRenderer.icons.unknownSvg,
+  };
 
   static injectStyles() {
     if (document.getElementById(NowPlayingArtistRenderer.styleElementId)) {
@@ -2565,6 +2569,26 @@ class NowPlayingArtistRenderer {
         border-right: 5px solid transparent;
         border-bottom: 10px solid var(--uafy-artist-status-color);
         margin-bottom: 4px;
+      }
+      
+      .uafy-artist-status-shape[data-shape="crown"],
+      .uafy-artist-status-shape[data-shape="star"],
+      .uafy-artist-status-shape[data-shape="world"] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        color: var(--uafy-artist-status-color);
+        margin-bottom: 2px;
+      }
+
+      .uafy-artist-status-shape[data-shape="crown"] svg,
+      .uafy-artist-status-shape[data-shape="star"] svg,
+      .uafy-artist-status-shape[data-shape="world"] svg {
+        width: 14px;
+        height: 14px;
+        margin-left: 0 !important;
       }
     `;
 
