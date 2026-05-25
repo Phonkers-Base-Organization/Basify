@@ -1,3 +1,163 @@
+const UAfyLocales = {
+  en: {
+    settingsTitle: "UAfy Settings",
+
+    language: "Language",
+    locale: "Locale",
+    localeDescription:
+      "Choose the language used by UAfy settings and messages.",
+
+    skipping: "Skipping",
+    skipTracks: "Skip tracks",
+    skipTracksDescription:
+      "Automatically skip tracks based on the selected status filters.",
+    skipStatusFilter: "Skip status filter",
+    blocked: "Blocked",
+    blockedDescription:
+      "Skip blocked artists and tracks released by blocked distributors.",
+    warning: "Warning",
+    warningDescription: "Skip artists marked as warning.",
+    unknown: "Unknown",
+    unknownDescription: "Skip artists with unknown origin or status.",
+
+    popup: "Popup",
+    showSkipPopup: "Show skip popup",
+    showSkipPopupDescription: "Show a notification when UAfy skips a track.",
+    popupDuration: "Popup duration",
+    popupDurationDescription:
+      "How long each skip popup stays visible, in milliseconds.",
+    visiblePopupLimit: "Visible popup limit",
+    visiblePopupLimitDescription:
+      "Maximum number of skip popups visible at the same time.",
+
+    flags: "Flags",
+    useEmojiFlags: "Use emoji flags",
+    useEmojiFlagsDescription:
+      "Use country emoji flags instead of flag images in now playing and artist profile.",
+
+    nowPlaying: "Now Playing",
+    highlightNowPlayingBar: "Highlight now playing bar",
+    highlightNowPlayingBarDescription:
+      "Color the now playing bar based on the strongest artist status on the current track.",
+    formatArtistNames: "Format artist names",
+    formatArtistNamesDescription:
+      "Color artist names in now playing when the artist exists in the UAfy database.",
+    showStatusShapes: "Show status shapes",
+    showStatusShapesDescription:
+      "Show a small shape next to each artist name: blocked square, warning triangle, approved circle, etc.",
+    showArtistFlags: "Show artist flags",
+    showArtistFlagsDescription:
+      "Show country flags next to artist names in now playing.",
+
+    storage: "Storage",
+    artistCacheLimit: "Artist cache limit",
+    artistCacheLimitDescription: "Maximum number of artists stored locally.",
+
+    reset: "Reset",
+    clearUafyData: "Clear UAfy data",
+    clearUafyDataDescription: "This clears cached artists and settings.",
+    resetButton: "Reset",
+    settingsResetNotification: "UAfy settings have been reset",
+
+    trust: {
+      pride: "Our pride",
+      base: "Based",
+      approved: "You can listen",
+      warning: "Be careful",
+      blocked: "Don't listen",
+      unknown: "Origin not confirmed",
+      noInfo: "No artist info",
+      blockedDistributor: "Blocked distributor",
+    },
+
+    unknownOrigin: "Unknown origin",
+    trackSkipped: "Track skipped",
+    unknownTrack: "Unknown track",
+    unknownArtist: "Unknown artist",
+    unknownDistributor: "Unknown distributor",
+  },
+
+  uk: {
+    settingsTitle: "Налаштування UAfy",
+
+    language: "Мова",
+    locale: "Мова",
+    localeDescription: "Оберіть мову для налаштувань і повідомлень UAfy.",
+
+    skipping: "Пропуск треків",
+    skipTracks: "Пропускати треки",
+    skipTracksDescription:
+      "Автоматично пропускати треки за вибраними статусами.",
+    skipStatusFilter: "Фільтр статусів для пропуску",
+    blocked: "Заблоковані",
+    blockedDescription:
+      "Пропускати заблокованих артистів і треки від заблокованих дистрибʼюторів.",
+    warning: "Попередження",
+    warningDescription: "Пропускати артистів зі статусом попередження.",
+    unknown: "Невідомі",
+    unknownDescription:
+      "Пропускати артистів із невідомим походженням або статусом.",
+
+    popup: "Сповіщення",
+    showSkipPopup: "Показувати сповіщення про пропуск",
+    showSkipPopupDescription:
+      "Показувати сповіщення, коли UAfy пропускає трек.",
+    popupDuration: "Тривалість сповіщення",
+    popupDurationDescription:
+      "Скільки мілісекунд сповіщення про пропуск залишається видимим.",
+    visiblePopupLimit: "Ліміт видимих сповіщень",
+    visiblePopupLimitDescription:
+      "Максимальна кількість сповіщень про пропуск одночасно.",
+
+    flags: "Прапори",
+    useEmojiFlags: "Використовувати emoji-прапори",
+    useEmojiFlagsDescription:
+      "Використовувати emoji-прапори замість зображень прапорів у Now Playing та профілі артиста.",
+
+    nowPlaying: "Now Playing",
+    highlightNowPlayingBar: "Підсвічувати Now Playing bar",
+    highlightNowPlayingBarDescription:
+      "Фарбувати Now Playing bar за найсильнішим статусом артиста в поточному треку.",
+    formatArtistNames: "Форматувати імена артистів",
+    formatArtistNamesDescription:
+      "Фарбувати імена артистів у Now Playing, якщо артист є в базі UAfy.",
+    showStatusShapes: "Показувати фігури статусу",
+    showStatusShapesDescription:
+      "Показувати маленьку фігуру біля імені артиста: квадрат для заблокованих, трикутник для попереджень, коло для дозволених тощо.",
+    showArtistFlags: "Показувати прапори артистів",
+    showArtistFlagsDescription:
+      "Показувати прапори країн біля імен артистів у Now Playing.",
+
+    storage: "Сховище",
+    artistCacheLimit: "Ліміт кешу артистів",
+    artistCacheLimitDescription:
+      "Максимальна кількість артистів у локальному кеші.",
+
+    reset: "Скидання",
+    clearUafyData: "Очистити дані UAfy",
+    clearUafyDataDescription: "Це очистить кеш артистів і налаштування.",
+    resetButton: "Скинути",
+    settingsResetNotification: "Налаштування UAfy скинуто",
+
+    trust: {
+      pride: "Наша гордість",
+      base: "Базований",
+      approved: "Можеш слухати",
+      warning: "Будь обережний",
+      blocked: "Не слухай це",
+      unknown: "Походження не підтверджено",
+      noInfo: "Немає інформації про артиста",
+      blockedDistributor: "Заблокований дистрибʼютор",
+    },
+
+    unknownOrigin: "Невідоме походження",
+    trackSkipped: "Трек пропущено",
+    unknownTrack: "Невідомий трек",
+    unknownArtist: "Невідомий артист",
+    unknownDistributor: "Невідомий дистрибʼютор",
+  },
+};
+
 const BLOCKED_DISTRIBUTORS = [
   "0TO8",
   "88 CEBEP",
@@ -53,6 +213,76 @@ const BLOCKED_DISTRIBUTORS = [
   "СТУДИЯ СОЮЗ",
 ];
 
+class UAfyI18n {
+  static defaultLocale = "en";
+  static lowercaseCountryNames = {
+    ru: {
+      en: "russia",
+      uk: "росія",
+    },
+    by: {
+      en: "belarus",
+      uk: "білорусь",
+    },
+  };
+
+  static getLocale() {
+    const locale = LocalStorageManager.getSettings().locale;
+
+    return UAfyLocales[locale] ? locale : UAfyI18n.defaultLocale;
+  }
+
+  static t(key, locale = UAfyI18n.getLocale()) {
+    if (!key) {
+      return "";
+    }
+
+    const dictionary =
+      UAfyLocales[locale] || UAfyLocales[UAfyI18n.defaultLocale];
+
+    return (
+      UAfyI18n.getNestedValue(dictionary, key) ??
+      UAfyI18n.getNestedValue(UAfyLocales[UAfyI18n.defaultLocale], key) ??
+      key
+    );
+  }
+
+  static getNestedValue(object, path) {
+    return String(path)
+      .split(".")
+      .reduce((currentValue, keyPart) => {
+        return currentValue?.[keyPart];
+      }, object);
+  }
+
+  static countryName(countryCode, locale = UAfyI18n.getLocale()) {
+    if (!countryCode) {
+      return "";
+    }
+
+    const normalizedCountryCode = String(countryCode).trim().toLowerCase();
+
+    const customCountryName =
+      UAfyI18n.lowercaseCountryNames[normalizedCountryCode]?.[locale] ??
+      UAfyI18n.lowercaseCountryNames[normalizedCountryCode]?.[
+        UAfyI18n.defaultLocale
+      ];
+
+    if (customCountryName) {
+      return customCountryName;
+    }
+
+    try {
+      return new Intl.DisplayNames([locale], {
+        type: "region",
+      }).of(String(countryCode).toUpperCase());
+    } catch (error) {
+      console.warn("UAfy failed to translate country name:", error);
+      return String(countryCode).toUpperCase();
+    }
+  }
+}
+
 class LocalStorageManager {
   // JSON.parse(Spicetify.LocalStorage.get("UAfy:data"))
   // Spicetify.LocalStorage.remove("UAfy:data")
@@ -80,8 +310,8 @@ class LocalStorageManager {
       visibleToastLimit: 3,
 
       emojiFlags: true,
-      formatNowPlayingBar: true,
 
+      formatNowPlayingBar: true,
       formatNowPlayingArtistName: true,
       showNowPlayingArtistStatusShape: true,
       showNowPlayingArtistFlags: true,
@@ -381,7 +611,7 @@ class UafyTrack {
     this.raw = spotifyTrack;
     this.uri = spotifyTrack.uri;
     this.id = spotifyTrack.uri?.split(":")?.[2] || null;
-    this.name = spotifyTrack.name || "Unknown track";
+    this.name = spotifyTrack.name || UAfyI18n.t("unknownTrack");
 
     this.artistsById = {};
 
@@ -668,42 +898,42 @@ class ArtistInfoSectionRenderer {
 
   static badges = {
     pride: {
-      text: "Our pride",
+      textKey: "trust.pride",
       icon: ArtistInfoSectionRenderer.icons.crownSvg,
       bg: "#264b61",
     },
     base: {
-      text: "Based",
+      textKey: "trust.base",
       icon: ArtistInfoSectionRenderer.icons.starSvg,
       bg: "#553995",
     },
     approved: {
-      text: "You can listen",
+      textKey: "trust.approved",
       icon: ArtistInfoSectionRenderer.icons.thumbsUpSvg,
       bg: "#23593e",
     },
     warning: {
-      text: "Be careful",
+      textKey: "trust.warning",
       icon: ArtistInfoSectionRenderer.icons.warningSvg,
       bg: "#77471e",
     },
     blocked: {
-      text: "Don't listen",
+      textKey: "trust.blocked",
       icon: ArtistInfoSectionRenderer.icons.banSvg,
       bg: "#723433",
     },
     unknown: {
-      text: "Origin not confirmed",
+      textKey: "trust.unknown",
       icon: ArtistInfoSectionRenderer.icons.unknownSvg,
       bg: "#2f2f2f",
     },
     noInfo: {
-      text: "No artist info",
+      textKey: "trust.noInfo",
       icon: ArtistInfoSectionRenderer.icons.unknownSvg,
       bg: "#2f2f2f",
     },
     blockedDistributor: {
-      text: "Blocked distributor",
+      textKey: "trust.blockedDistributor",
       icon: ArtistInfoSectionRenderer.icons.banSvg,
       bg: "#723433",
     },
@@ -747,7 +977,7 @@ class ArtistInfoSectionRenderer {
       });
     } else {
       countriesRow.appendChild(
-        ArtistInfoSectionRenderer.createSimpleTag("Unknown origin"),
+        ArtistInfoSectionRenderer.createSimpleTag(UAfyI18n.t("unknownOrigin")),
       );
     }
 
@@ -791,7 +1021,7 @@ class ArtistInfoSectionRenderer {
     badge.appendChild(country.flagImg(settings.emojiFlags, 0, 18, 24));
 
     const name = document.createElement("span");
-    name.textContent = country.name;
+    name.textContent = UAfyI18n.countryName(country.countryCode);
 
     badge.appendChild(name);
 
@@ -807,7 +1037,7 @@ class ArtistInfoSectionRenderer {
     badge.classList.add("uafy-trust-badge");
     badge.dataset.type = type;
 
-    badge.innerHTML = `<span>${badgeData.text}</span>${badgeData.icon}`;
+    badge.innerHTML = `<span>${UAfyI18n.t(badgeData.textKey)}</span>${badgeData.icon}`;
 
     Object.assign(badge.style, {
       display: "inline-flex",
@@ -1012,12 +1242,60 @@ class SettingsMenu {
     SettingsMenu.injectStyles();
 
     SettingsMenu.button = new Spicetify.Topbar.Button(
-      "UAfy Settings",
+      UAfyI18n.t("settingsTitle"),
       SettingsMenu.icons.settings,
       SettingsMenu.open,
       false,
       true,
     );
+  }
+
+  static updateLocalizedTitles(locale = UAfyI18n.getLocale()) {
+    SettingsMenu.updateButtonTitle(locale);
+    SettingsMenu.updateModalTitle(locale);
+  }
+
+  static updateButtonTitle(locale = UAfyI18n.getLocale()) {
+    const title = UAfyI18n.t("settingsTitle", locale);
+
+    if (!SettingsMenu.button) return;
+
+    SettingsMenu.button.label = title;
+
+    SettingsMenu.button.element?.setAttribute("aria-label", title);
+    SettingsMenu.button.element?.setAttribute("title", title);
+
+    SettingsMenu.button.tippy?.setContent?.(title);
+    SettingsMenu.button.tippy?.setProps?.({
+      content: title,
+    });
+  }
+
+  static updateModalTitle(locale = UAfyI18n.getLocale()) {
+    const title = UAfyI18n.t("settingsTitle", locale);
+
+    requestAnimationFrame(() => {
+      const settingsRoot = document.querySelector(".uafy-settings-react-root");
+
+      if (!settingsRoot) return;
+
+      const modal =
+        settingsRoot.closest('[role="dialog"]') ||
+        settingsRoot.closest('[class*="Modal"]') ||
+        document.querySelector('[role="dialog"]');
+
+      if (!modal) return;
+
+      const titleElement = Array.from(
+        modal.querySelectorAll('h1, [class*="Title"], [class*="title"]'),
+      ).find((element) => {
+        return !settingsRoot.contains(element);
+      });
+
+      if (!titleElement) return;
+
+      titleElement.textContent = title;
+    });
   }
 
   static open() {
@@ -1028,7 +1306,7 @@ class SettingsMenu {
     container.className = "uafy-settings-react-root";
 
     Spicetify.PopupModal.display({
-      title: "UAfy Settings",
+      title: UAfyI18n.t("settingsTitle"),
       content: container,
       isLarge: true,
     });
@@ -1037,21 +1315,16 @@ class SettingsMenu {
   }
 
   static async applyRuntimeSettings(settings, changedSettings = {}) {
+    const emojiFlagsChanged = Object.hasOwn(changedSettings, "emojiFlags");
+    const localeChanged = Object.hasOwn(changedSettings, "locale");
+
     SkipToastRenderer.applySettings(settings, changedSettings);
 
-    const track = NowPlayingRuntimeState.track;
-
-    const emojiFlagsChanged = Object.hasOwn(changedSettings, "emojiFlags");
-
-    if (!track) {
-      if (emojiFlagsChanged) {
-        refreshCurrentArtistPageFlags().catch((error) => {
-          console.warn("UAfy failed to refresh artist page flags:", error);
-        });
-      }
-
-      return;
+    if (localeChanged) {
+      SettingsMenu.updateLocalizedTitles(settings.locale);
     }
+
+    const track = NowPlayingRuntimeState.track;
 
     const nowPlayingSettingsChanged =
       Object.hasOwn(changedSettings, "formatNowPlayingBar") ||
@@ -1063,18 +1336,18 @@ class SettingsMenu {
     if (nowPlayingSettingsChanged) {
       const artistSpans = NowPlayingRuntimeState.artistSpans;
 
-      if (artistSpans) {
+      if (track && artistSpans) {
         renderNowPlayingTrack(track, artistSpans);
       } else if (!settings.formatNowPlayingBar) {
         NowPlayingThemeOverlayRenderer.clear();
-      } else {
+      } else if (track) {
         NowPlayingThemeOverlayRenderer.applyFromTrack(track);
       }
     }
 
-    if (emojiFlagsChanged) {
-      refreshCurrentArtistPageFlags().catch((error) => {
-        console.warn("UAfy failed to refresh artist page flags:", error);
+    if (emojiFlagsChanged || localeChanged) {
+      refreshCurrentArtistPage().catch((error) => {
+        console.warn("UAfy failed to refresh artist page:", error);
       });
     }
 
@@ -1084,12 +1357,8 @@ class SettingsMenu {
       Object.hasOwn(changedSettings, "skipWarningArtists") ||
       Object.hasOwn(changedSettings, "skipUnknownArtists");
 
-    if (!skipSettingsChanged) return;
-    if (!track.shouldSkipTrack()) return;
-
-    SkipToastRenderer.show(track);
-
-    Spicetify.Player.next();
+    if (!skipSettingsChanged || !track) return;
+    handleTrackSkipIfNeeded(track);
   }
 
   static Component() {
@@ -1098,6 +1367,10 @@ class SettingsMenu {
     const [settings, setSettings] = React.useState(() => {
       return LocalStorageManager.getSettings();
     });
+
+    const t = (key) => {
+      return UAfyI18n.t(key, settings.locale);
+    };
 
     const saveSettings = async (newSettings) => {
       const updatedSettings = {
@@ -1109,7 +1382,11 @@ class SettingsMenu {
 
       await LocalStorageManager.updateSettings(newSettings);
 
-      SettingsMenu.applyRuntimeSettings(updatedSettings, newSettings);
+      SettingsMenu.applyRuntimeSettings(updatedSettings, newSettings).catch(
+        (error) => {
+          console.error("UAfy failed to apply runtime settings:", error);
+        },
+      );
     };
 
     const resetSettings = async () => {
@@ -1117,9 +1394,18 @@ class SettingsMenu {
 
       setSettings(defaultSettings);
 
-      SettingsMenu.applyRuntimeSettings(defaultSettings, defaultSettings);
+      SettingsMenu.applyRuntimeSettings(defaultSettings, defaultSettings).catch(
+        (error) => {
+          console.error(
+            "UAfy failed to apply runtime settings after reset:",
+            error,
+          );
+        },
+      );
 
-      Spicetify.showNotification("UAfy settings have been reset");
+      Spicetify.showNotification(
+        UAfyI18n.t("settingsResetNotification", defaultSettings.locale),
+      );
     };
 
     const skipStatusSwitchesEnabled =
@@ -1142,12 +1428,12 @@ class SettingsMenu {
       },
 
       React.createElement(SettingsMenu.SectionTitle, {
-        title: "Language",
+        title: t("language"),
       }),
 
       React.createElement(SettingsMenu.SelectRow, {
-        label: "Locale",
-        description: "Choose the language used by UAfy settings and messages.",
+        label: t("locale"),
+        description: t("localeDescription"),
         value: settings.locale,
         options: [
           {
@@ -1155,7 +1441,7 @@ class SettingsMenu {
             label: "English",
           },
           {
-            value: "ua",
+            value: "uk",
             label: "Українська",
           },
         ],
@@ -1167,13 +1453,12 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.SectionTitle, {
-        title: "Skipping",
+        title: t("skipping"),
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Skip tracks",
-        description:
-          "Automatically skip tracks based on the selected status filters.",
+        label: t("skipTracks"),
+        description: t("skipTracksDescription"),
         value: skipMainSwitchEnabled,
         disabled: !skipStatusSwitchesEnabled,
         onChange: (value) => {
@@ -1184,13 +1469,12 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.SubSectionTitle, {
-        title: "Skip status filter",
+        title: t("skipStatusFilter"),
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Blocked",
-        description:
-          "Skip blocked artists and tracks released by blocked distributors.",
+        label: t("blocked"),
+        description: t("blockedDescription"),
         value: settings.skipBlockedArtists,
         disabled: skipSubSwitchesDisabled,
         onChange: (value) => {
@@ -1201,8 +1485,8 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Warning",
-        description: "Skip artists marked as warning.",
+        label: t("warning"),
+        description: t("warningDescription"),
         value: settings.skipWarningArtists,
         disabled: skipSubSwitchesDisabled,
         onChange: (value) => {
@@ -1213,8 +1497,8 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Unknown",
-        description: "Skip artists with unknown origin or status.",
+        label: t("unknown"),
+        description: t("unknownDescription"),
         value: settings.skipUnknownArtists,
         disabled: skipSubSwitchesDisabled,
         onChange: (value) => {
@@ -1225,12 +1509,12 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.SectionTitle, {
-        title: "Popup",
+        title: t("popup"),
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Show skip popup",
-        description: "Show a notification when UAfy skips a track.",
+        label: t("showSkipPopup"),
+        description: t("showSkipPopupDescription"),
         value: settings.popupEnabled,
         onChange: (value) => {
           saveSettings({
@@ -1240,8 +1524,8 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.NumberRow, {
-        label: "Popup duration",
-        description: "How long each skip popup stays visible, in milliseconds.",
+        label: t("popupDuration"),
+        description: t("popupDurationDescription"),
         value: settings.popupDurationMs,
         min: 1000,
         max: 60000,
@@ -1254,8 +1538,8 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.NumberRow, {
-        label: "Visible popup limit",
-        description: "Maximum number of skip popups visible at the same time.",
+        label: t("visiblePopupLimit"),
+        description: t("visiblePopupLimitDescription"),
         value: settings.visibleToastLimit,
         min: 1,
         max: 10,
@@ -1268,13 +1552,12 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.SectionTitle, {
-        title: "Flags",
+        title: t("flags"),
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Use emoji flags",
-        description:
-          "Use country emoji flags instead of flag images in now playing and artist profile.",
+        label: t("useEmojiFlags"),
+        description: t("useEmojiFlagsDescription"),
         value: settings.emojiFlags,
         onChange: (value) => {
           saveSettings({
@@ -1284,13 +1567,12 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.SectionTitle, {
-        title: "Now Playing",
+        title: t("nowPlaying"),
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Highlight now playing bar",
-        description:
-          "Color the now playing bar based on the strongest artist status on the current track.",
+        label: t("highlightNowPlayingBar"),
+        description: t("highlightNowPlayingBarDescription"),
         value: settings.formatNowPlayingBar,
         onChange: (value) => {
           saveSettings({
@@ -1300,9 +1582,8 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Format artist names",
-        description:
-          "Color artist names in now playing when the artist exists in the UAfy database.",
+        label: t("formatArtistNames"),
+        description: t("formatArtistNamesDescription"),
         value: settings.formatNowPlayingArtistName,
         onChange: (value) => {
           saveSettings({
@@ -1312,9 +1593,8 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Show status shapes",
-        description:
-          "Show a small shape next to each artist name: blocked square, warning triangle, approved circle, etc.",
+        label: t("showStatusShapes"),
+        description: t("showStatusShapesDescription"),
         value: settings.showNowPlayingArtistStatusShape,
         onChange: (value) => {
           saveSettings({
@@ -1324,8 +1604,8 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.ToggleRow, {
-        label: "Show artist flags",
-        description: "Show country flags next to artist names in now playing.",
+        label: t("showArtistFlags"),
+        description: t("showArtistFlagsDescription"),
         value: settings.showNowPlayingArtistFlags,
         onChange: (value) => {
           saveSettings({
@@ -1335,12 +1615,12 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.SectionTitle, {
-        title: "Storage",
+        title: t("storage"),
       }),
 
       React.createElement(SettingsMenu.NumberRow, {
-        label: "Artist cache limit",
-        description: "Maximum number of artists stored locally.",
+        label: t("artistCacheLimit"),
+        description: t("artistCacheLimitDescription"),
         value: settings.artistCacheLimit,
         min: 1,
         max: 1000,
@@ -1352,13 +1632,13 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.SectionTitle, {
-        title: "Reset",
+        title: t("reset"),
       }),
 
       React.createElement(SettingsMenu.ButtonRow, {
-        label: "Clear UAfy data",
-        description: "This clears cached artists and settings.",
-        buttonText: "Reset",
+        label: t("clearUafyData"),
+        description: t("clearUafyDataDescription"),
+        buttonText: t("resetButton"),
         onClick: resetSettings,
       }),
     );
@@ -1824,7 +2104,7 @@ class SkipToastRenderer {
 
     const title = document.createElement("div");
     title.className = "uafy-skip-toast-title";
-    title.textContent = "Track skipped";
+    title.textContent = UAfyI18n.t("trackSkipped");
 
     const closeButton = document.createElement("button");
     closeButton.className = "uafy-skip-toast-close";
@@ -1890,7 +2170,7 @@ class SkipToastRenderer {
     const artistName = document.createElement("button");
     artistName.className = "uafy-skip-toast-artist-name";
     artistName.type = "button";
-    artistName.textContent = artist?.name || "Unknown artist";
+    artistName.textContent = artist?.name || UAfyI18n.t("unknownArtist");
 
     if (artist?.id) {
       artistName.addEventListener("click", (event) => {
@@ -1922,7 +2202,8 @@ class SkipToastRenderer {
 
     const distributor = document.createElement("div");
     distributor.className = "uafy-skip-toast-distributor-name";
-    distributor.textContent = distributorName || "Unknown distributor";
+    distributor.textContent =
+      distributorName || UAfyI18n.t("unknownDistributor");
 
     const badgesWrapper = document.createElement("div");
     badgesWrapper.className = "uafy-skip-toast-badges";
@@ -2081,6 +2362,7 @@ class SkipToastRenderer {
       }
 
       .uafy-skip-toast-title {
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
         font-size: 13px;
         font-weight: 700;
         color: var(--spice-subtext, #b3b3b3);
@@ -2441,8 +2723,6 @@ class NowPlayingArtistRenderer {
 
       const artistLink = artistSpan.querySelector("a") || artistSpan;
 
-      const artistExistsInDatabase = Boolean(artist.name);
-
       if (settings.formatNowPlayingArtistName && statusStyle?.color) {
         artistLink.classList.add("uafy-now-playing-artist-name");
         artistLink.style.setProperty(
@@ -2636,7 +2916,7 @@ async function loadArtistPage(location = Spicetify.Platform.History.location) {
   headerTextElement.appendChild(artistInfoSection);
 }
 
-async function refreshCurrentArtistPageFlags() {
+async function refreshCurrentArtistPage() {
   const location = Spicetify.Platform.History.location;
   const pageType = location.pathname.split("/")[1];
 
