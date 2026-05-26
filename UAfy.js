@@ -226,6 +226,26 @@ class UAfyI18n {
     },
   };
 
+  static getSpotifyLocale() {
+    return Spicetify.Locale.getLocale();
+  }
+
+  static normalizeLocale(locale) {
+    const languageCode = String(locale || "")
+      .split("-")[0]
+      .toLowerCase();
+
+    if (languageCode === "uk" || languageCode === "ru") {
+      return "uk";
+    }
+
+    return UAfyI18n.defaultLocale;
+  }
+
+  static getInitialLocale() {
+    return UAfyI18n.normalizeLocale(UAfyI18n.getSpotifyLocale());
+  }
+
   static getLocale() {
     const locale = LocalStorageManager.getSettings().locale;
 
@@ -295,30 +315,32 @@ class LocalStorageManager {
 
   static lock = Promise.resolve();
 
-  static defaultData = {
-    artistsById: {},
-    settings: {
-      locale: "en",
+  static createDefaultData() {
+    return {
+      artistsById: {},
+      settings: {
+        locale: UAfyI18n.getInitialLocale(),
 
-      skipEnabled: true,
-      skipBlockedArtists: true,
-      skipWarningArtists: false,
-      skipUnknownArtists: false,
+        skipEnabled: true,
+        skipBlockedArtists: true,
+        skipWarningArtists: false,
+        skipUnknownArtists: false,
 
-      popupEnabled: true,
-      popupDurationMs: 3500,
-      visibleToastLimit: 3,
+        popupEnabled: true,
+        popupDurationMs: 3500,
+        visibleToastLimit: 3,
 
-      emojiFlags: true,
+        emojiFlags: true,
 
-      formatNowPlayingBar: true,
-      formatNowPlayingArtistName: true,
-      showNowPlayingArtistStatusShape: true,
-      showNowPlayingArtistFlags: true,
+        formatNowPlayingBar: true,
+        formatNowPlayingArtistName: true,
+        showNowPlayingArtistStatusShape: true,
+        showNowPlayingArtistFlags: true,
 
-      artistCacheLimit: 150,
-    },
-  };
+        artistCacheLimit: 150,
+      },
+    };
+  }
 
   static loadData() {
     try {
@@ -327,11 +349,11 @@ class LocalStorageManager {
       );
 
       if (!rawData) {
-        return structuredClone(LocalStorageManager.defaultData);
+        return LocalStorageManager.createDefaultData();
       }
 
       const parsedData = JSON.parse(rawData);
-      const defaultData = structuredClone(LocalStorageManager.defaultData);
+      const defaultData = LocalStorageManager.createDefaultData();
 
       return {
         ...defaultData,
@@ -343,7 +365,7 @@ class LocalStorageManager {
       };
     } catch (error) {
       console.error("Failed to load extension storage:", error);
-      return structuredClone(LocalStorageManager.defaultData);
+      return LocalStorageManager.createDefaultData();
     }
   }
 
@@ -453,9 +475,7 @@ class LocalStorageManager {
   }
 
   static async resetSettings() {
-    const defaultSettings = structuredClone(
-      LocalStorageManager.defaultData.settings,
-    );
+    const defaultSettings = LocalStorageManager.createDefaultData().settings;
 
     await LocalStorageManager.updateData((data) => {
       data.settings = defaultSettings;
