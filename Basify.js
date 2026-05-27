@@ -883,9 +883,13 @@ class BasifyTrack {
 
             if (brightness < 25 || brightness > 235) continue;
 
-            const quantizedRed = Math.round(red / 24) * 24;
-            const quantizedGreen = Math.round(green / 24) * 24;
-            const quantizedBlue = Math.round(blue / 24) * 24;
+            const quantizeColorChannel = (value) => {
+              return Math.min(255, Math.round(value / 24) * 24);
+            };
+
+            const quantizedRed = quantizeColorChannel(red);
+            const quantizedGreen = quantizeColorChannel(green);
+            const quantizedBlue = quantizeColorChannel(blue);
 
             const key = `${quantizedRed},${quantizedGreen},${quantizedBlue}`;
 
@@ -925,7 +929,9 @@ class BasifyTrack {
   static rgbToHex(red, green, blue) {
     return `#${[red, green, blue]
       .map((value) => {
-        return value.toString(16).padStart(2, "0");
+        const clampedValue = Math.max(0, Math.min(255, Math.round(value)));
+
+        return clampedValue.toString(16).padStart(2, "0");
       })
       .join("")}`;
   }
