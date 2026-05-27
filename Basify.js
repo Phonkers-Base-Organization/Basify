@@ -1621,13 +1621,14 @@ class SettingsMenu {
       React.createElement(SettingsMenu.NumberRow, {
         label: t("popupDuration"),
         description: t("popupDurationDescription"),
-        value: settings.popupDurationMs,
-        min: 1000,
-        max: 60000,
+        value: settings.popupDurationMs / 1000,
+        min: 1,
+        max: 60,
+        step: 0.5,
         disabled: popupSubSettingsDisabled,
         onChange: (value) => {
           saveSettings({
-            popupDurationMs: value,
+            popupDurationMs: value * 1000,
           });
         },
       }),
@@ -1837,6 +1838,7 @@ class SettingsMenu {
     value,
     min,
     max,
+    step = 1,
     disabled = false,
     onChange,
   }) {
@@ -1858,10 +1860,7 @@ class SettingsMenu {
         return;
       }
 
-      const clampedValue = Math.min(
-        max,
-        Math.max(min, Math.floor(numberValue)),
-      );
+      const clampedValue = Math.min(max, Math.max(min, numberValue));
 
       setInputValue(String(clampedValue));
       onChange(clampedValue);
@@ -1883,6 +1882,7 @@ class SettingsMenu {
         type: "number",
         min,
         max,
+        step,
         value: inputValue,
         disabled,
         onChange: (event) => {
