@@ -1,0 +1,46 @@
+[
+  {
+    "name": "Basify",
+    "description": "Spicetify extension for identifying and skipping unreliable artists and distributors.",
+    "preview": "assets/en_animation.gif",
+    "main": "Basify.js",
+    "readme": "README.md",
+    "authors": [
+      {
+        "name": "I2oman",
+        "url": "https://github.com/I2oman"
+      }
+    ],
+    "tags": [
+      "filtering",
+      "artists",
+      "distributors",
+      "phonkersbase",
+      "country of origin",
+      "music safety",
+      "don't support russia"
+    ]
+  },
+  {
+    "name": "Basify",
+    "description": "Розширення Spicetify для виявлення та пропуску ненадійних виконавців і дистрибʼюторів.",
+    "preview": "assets/uk_animation.gif",
+    "main": "Basify.js",
+    "readme": "assets/UK_README.md",
+    "authors": [
+      {
+        "name": "I2oman",
+        "url": "https://github.com/I2oman"
+      }
+    ],
+    "tags": [
+      "музичні фільтри",
+      "виконавці",
+      "дистрибʼютори",
+      "phonkersbase",
+      "країна походження",
+      "безпечне прослуховування",
+      "не підтримуйте росію"
+    ]
+  }
+]
