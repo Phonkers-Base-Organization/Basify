@@ -1,11 +1,11 @@
-const UAfyLocales = {
+const BasifyLocales = {
   en: {
-    settingsTitle: "UAfy Settings",
+    settingsTitle: "Basify Settings",
 
     language: "Language",
     locale: "Locale",
     localeDescription:
-      "Choose the language used by UAfy settings and messages.",
+      "Choose the language used by Basify settings and messages.",
 
     skipping: "Skipping",
     skipTracks: "Skip tracks",
@@ -22,7 +22,7 @@ const UAfyLocales = {
 
     popup: "Popup",
     showSkipPopup: "Show skip popup",
-    showSkipPopupDescription: "Show a notification when UAfy skips a track.",
+    showSkipPopupDescription: "Show a notification when Basify skips a track.",
     popupDuration: "Popup duration",
     popupDurationDescription:
       "How long each skip popup stays visible, in milliseconds.",
@@ -41,7 +41,7 @@ const UAfyLocales = {
       "Color the now playing bar based on the strongest artist status on the current track.",
     formatArtistNames: "Format artist names",
     formatArtistNamesDescription:
-      "Color artist names in now playing when the artist exists in the UAfy database.",
+      "Color artist names in now playing when the artist exists in the Basify database.",
     showStatusShapes: "Show status shapes",
     showStatusShapesDescription:
       "Show a small shape next to each artist name: blocked square, warning triangle, approved circle, etc.",
@@ -54,10 +54,10 @@ const UAfyLocales = {
     artistCacheLimitDescription: "Maximum number of artists stored locally.",
 
     reset: "Reset",
-    clearUafyData: "Clear UAfy data",
-    clearUafyDataDescription: "This clears cached artists and settings.",
+    clearBasifyData: "Clear Basify data",
+    clearBasifyDataDescription: "This clears cached artists and settings.",
     resetButton: "Reset",
-    settingsResetNotification: "UAfy settings have been reset",
+    settingsResetNotification: "Basify settings have been reset",
 
     poweredBy: "Powered by",
     allInformationTakenFrom: "All information taken from database",
@@ -82,11 +82,11 @@ const UAfyLocales = {
   },
 
   uk: {
-    settingsTitle: "Налаштування UAfy",
+    settingsTitle: "Налаштування Basify",
 
     language: "Мова",
     locale: "Мова",
-    localeDescription: "Оберіть мову для налаштувань і повідомлень UAfy.",
+    localeDescription: "Оберіть мову для налаштувань і повідомлень Basify.",
 
     skipping: "Пропуск треків",
     skipTracks: "Пропускати треки",
@@ -105,7 +105,7 @@ const UAfyLocales = {
     popup: "Сповіщення",
     showSkipPopup: "Показувати сповіщення про пропуск",
     showSkipPopupDescription:
-      "Показувати сповіщення, коли UAfy пропускає трек.",
+      "Показувати сповіщення, коли Basify пропускає трек.",
     popupDuration: "Тривалість сповіщення",
     popupDurationDescription:
       "Скільки мілісекунд сповіщення про пропуск залишається видимим.",
@@ -124,7 +124,7 @@ const UAfyLocales = {
       "Фарбувати Now Playing bar за найсильнішим статусом артиста в поточному треку.",
     formatArtistNames: "Форматувати імена артистів",
     formatArtistNamesDescription:
-      "Фарбувати імена артистів у Now Playing, якщо артист є в базі UAfy.",
+      "Фарбувати імена артистів у Now Playing, якщо артист є в базі Basify.",
     showStatusShapes: "Показувати фігури статусу",
     showStatusShapesDescription:
       "Показувати маленьку фігуру біля імені артиста: квадрат для заблокованих, трикутник для попереджень, коло для дозволених тощо.",
@@ -138,10 +138,10 @@ const UAfyLocales = {
       "Максимальна кількість артистів у локальному кеші.",
 
     reset: "Скидання",
-    clearUafyData: "Очистити дані UAfy",
-    clearUafyDataDescription: "Це очистить кеш артистів і налаштування.",
+    clearBasifyData: "Очистити дані Basify",
+    clearBasifyDataDescription: "Це очистить кеш артистів і налаштування.",
     resetButton: "Скинути",
-    settingsResetNotification: "Налаштування UAfy скинуто",
+    settingsResetNotification: "Налаштування Basify скинуто",
 
     poweredBy: "За підтримки",
     allInformationTakenFrom: "Уся інформація взята з бази даних",
@@ -221,7 +221,7 @@ const BLOCKED_DISTRIBUTORS = [
   "СТУДИЯ СОЮЗ",
 ];
 
-class UAfyI18n {
+class BasifyI18n {
   static defaultLocale = "en";
   static lowercaseCountryNames = {
     ru: {
@@ -247,34 +247,34 @@ class UAfyI18n {
       return "uk";
     }
 
-    return UAfyI18n.defaultLocale;
+    return BasifyI18n.defaultLocale;
   }
 
   static getInitialLocale() {
-    return UAfyI18n.normalizeLocale(UAfyI18n.getSpotifyLocale());
+    return BasifyI18n.normalizeLocale(BasifyI18n.getSpotifyLocale());
   }
 
   static getLocale() {
     const locale = LocalStorageManager.getSettings().locale;
 
-    return UAfyLocales[locale] ? locale : UAfyI18n.defaultLocale;
+    return BasifyLocales[locale] ? locale : BasifyI18n.defaultLocale;
   }
 
-  static getPhonkersbaseLocalePath(locale = UAfyI18n.getLocale()) {
+  static getPhonkersbaseLocalePath(locale = BasifyI18n.getLocale()) {
     return locale === "uk" ? "uk" : "en";
   }
 
-  static t(key, locale = UAfyI18n.getLocale()) {
+  static t(key, locale = BasifyI18n.getLocale()) {
     if (!key) {
       return "";
     }
 
     const dictionary =
-      UAfyLocales[locale] || UAfyLocales[UAfyI18n.defaultLocale];
+      BasifyLocales[locale] || BasifyLocales[BasifyI18n.defaultLocale];
 
     return (
-      UAfyI18n.getNestedValue(dictionary, key) ??
-      UAfyI18n.getNestedValue(UAfyLocales[UAfyI18n.defaultLocale], key) ??
+      BasifyI18n.getNestedValue(dictionary, key) ??
+      BasifyI18n.getNestedValue(BasifyLocales[BasifyI18n.defaultLocale], key) ??
       key
     );
   }
@@ -287,7 +287,7 @@ class UAfyI18n {
       }, object);
   }
 
-  static countryName(countryCode, locale = UAfyI18n.getLocale()) {
+  static countryName(countryCode, locale = BasifyI18n.getLocale()) {
     if (!countryCode) {
       return "";
     }
@@ -295,9 +295,9 @@ class UAfyI18n {
     const normalizedCountryCode = String(countryCode).trim().toLowerCase();
 
     const customCountryName =
-      UAfyI18n.lowercaseCountryNames[normalizedCountryCode]?.[locale] ??
-      UAfyI18n.lowercaseCountryNames[normalizedCountryCode]?.[
-        UAfyI18n.defaultLocale
+      BasifyI18n.lowercaseCountryNames[normalizedCountryCode]?.[locale] ??
+      BasifyI18n.lowercaseCountryNames[normalizedCountryCode]?.[
+        BasifyI18n.defaultLocale
       ];
 
     if (customCountryName) {
@@ -309,21 +309,21 @@ class UAfyI18n {
         type: "region",
       }).of(String(countryCode).toUpperCase());
     } catch (error) {
-      console.warn("UAfy failed to translate country name:", error);
+      console.warn("Basify failed to translate country name:", error);
       return String(countryCode).toUpperCase();
     }
   }
 }
 
 class LocalStorageManager {
-  // JSON.parse(Spicetify.LocalStorage.get("UAfy:data"))
-  // Spicetify.LocalStorage.remove("UAfy:data")
+  // JSON.parse(Spicetify.LocalStorage.get("Basify:data"))
+  // Spicetify.LocalStorage.remove("Basify:data")
 
   static get storage() {
     return Spicetify.LocalStorage;
   }
 
-  static rootKey = "UAfy:data";
+  static rootKey = "Basify:data";
 
   static lock = Promise.resolve();
 
@@ -331,7 +331,7 @@ class LocalStorageManager {
     return {
       artistsById: {},
       settings: {
-        locale: UAfyI18n.getInitialLocale(),
+        locale: BasifyI18n.getInitialLocale(),
 
         skipEnabled: true,
         skipBlockedArtists: true,
@@ -638,12 +638,12 @@ class Artist {
   }
 }
 
-class UafyTrack {
+class BasifyTrack {
   constructor(spotifyTrack, trackArtists, distributors = []) {
     this.raw = spotifyTrack;
     this.uri = spotifyTrack.uri;
     this.id = spotifyTrack.uri?.split(":")?.[2] || null;
-    this.name = spotifyTrack.name || UAfyI18n.t("unknownTrack");
+    this.name = spotifyTrack.name || BasifyI18n.t("unknownTrack");
 
     this.artistsById = {};
 
@@ -689,7 +689,7 @@ class UafyTrack {
 
       return [...new Set(distributorTexts.filter(Boolean))];
     } catch (error) {
-      console.warn("UAfy failed to load album distributor data:", error);
+      console.warn("Basify failed to load album distributor data:", error);
       return [];
     }
   }
@@ -697,11 +697,11 @@ class UafyTrack {
   getBlockedDistributors() {
     return BLOCKED_DISTRIBUTORS.filter((blockedDistributor) => {
       const normalizedBlockedDistributor =
-        UafyTrack.normalizeDistributorName(blockedDistributor);
+        BasifyTrack.normalizeDistributorName(blockedDistributor);
 
       return this.distributors.some((distributorText) => {
         const normalizedDistributorText =
-          UafyTrack.normalizeDistributorName(distributorText);
+          BasifyTrack.normalizeDistributorName(distributorText);
 
         return normalizedDistributorText.includes(normalizedBlockedDistributor);
       });
@@ -787,11 +787,11 @@ class UafyTrack {
   }
 
   async getDominantColor() {
-    const imageUrl = UafyTrack.getTrackImageUrl(this.raw);
+    const imageUrl = BasifyTrack.getTrackImageUrl(this.raw);
 
     if (!imageUrl) return null;
 
-    return UafyTrack.extractDominantColorFromImage(imageUrl);
+    return BasifyTrack.extractDominantColorFromImage(imageUrl);
   }
 
   static getTrackImageUrl(spotifyTrack) {
@@ -878,9 +878,9 @@ class UafyTrack {
 
           const [red, green, blue] = dominantColor.split(",").map(Number);
 
-          resolve(UafyTrack.rgbToHex(red, green, blue));
+          resolve(BasifyTrack.rgbToHex(red, green, blue));
         } catch (error) {
-          console.warn("UAfy failed to extract dominant image color:", error);
+          console.warn("Basify failed to extract dominant image color:", error);
           resolve(null);
         }
       };
@@ -973,13 +973,13 @@ class ArtistInfoSectionRenderer {
 
   static createArtistInfoSection(artist) {
     const section = document.createElement("div");
-    section.classList.add("uafy-artist-info-section");
+    section.classList.add("basify-artist-info-section");
 
     const countriesRow = document.createElement("div");
-    countriesRow.classList.add("uafy-countries-row");
+    countriesRow.classList.add("basify-countries-row");
 
     const badgesRow = document.createElement("div");
-    badgesRow.classList.add("uafy-badges-row");
+    badgesRow.classList.add("basify-badges-row");
 
     Object.assign(section.style, {
       display: "flex",
@@ -1009,7 +1009,9 @@ class ArtistInfoSectionRenderer {
       });
     } else {
       countriesRow.appendChild(
-        ArtistInfoSectionRenderer.createSimpleTag(UAfyI18n.t("unknownOrigin")),
+        ArtistInfoSectionRenderer.createSimpleTag(
+          BasifyI18n.t("unknownOrigin"),
+        ),
       );
     }
 
@@ -1053,7 +1055,7 @@ class ArtistInfoSectionRenderer {
     badge.appendChild(country.flagImg(settings.emojiFlags, 0, 18, 24));
 
     const name = document.createElement("span");
-    name.textContent = UAfyI18n.countryName(country.countryCode);
+    name.textContent = BasifyI18n.countryName(country.countryCode);
 
     badge.appendChild(name);
 
@@ -1066,10 +1068,10 @@ class ArtistInfoSectionRenderer {
       ArtistInfoSectionRenderer.badges.noInfo;
 
     const badge = document.createElement("span");
-    badge.classList.add("uafy-trust-badge");
+    badge.classList.add("basify-trust-badge");
     badge.dataset.type = type;
 
-    badge.innerHTML = `<span>${UAfyI18n.t(badgeData.textKey)}</span>${badgeData.icon}`;
+    badge.innerHTML = `<span>${BasifyI18n.t(badgeData.textKey)}</span>${badgeData.icon}`;
 
     Object.assign(badge.style, {
       display: "inline-flex",
@@ -1107,7 +1109,7 @@ class ArtistInfoSectionRenderer {
 
   static createInfoSeparator() {
     const separator = document.createElement("span");
-    separator.classList.add("uafy-info-separator");
+    separator.classList.add("basify-info-separator");
 
     Object.assign(separator.style, {
       width: "1px",
@@ -1141,7 +1143,7 @@ class DomObserver {
 
           if (Date.now() - startTime >= timeoutMs) {
             clearInterval(intervalId);
-            reject(new Error("UAfy waitUntil timed out"));
+            reject(new Error("Basify waitUntil timed out"));
           }
         } catch (error) {
           clearInterval(intervalId);
@@ -1260,13 +1262,13 @@ class DomObserver {
 
 class SettingsMenu {
   static button = null;
-  static styleElementId = "uafy-settings-style";
+  static styleElementId = "basify-settings-style";
 
   static icons = {
-    settings: `<svg class="uafy-topbar-settings-icon" role="img" width="48" height="48" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="84" height="84" rx="42" fill="var(--uafy-settings-button-bg, #1f1f1f)"/>
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M58.001 54.917C58.6911 54.9173 59.251 55.4768 59.251 56.167V57.5918C59.9754 57.7975 60.6435 58.1807 61.1924 58.7139L62.4307 58C63.0284 57.6551 63.7924 57.8605 64.1377 58.458C64.4829 59.0559 64.2785 59.8208 63.6807 60.166L62.4443 60.8789C62.5361 61.2424 62.584 61.6188 62.584 62C62.584 62.3806 62.5358 62.7562 62.4443 63.1191L63.6816 63.834C64.2796 64.179 64.4846 64.944 64.1396 65.542C63.7945 66.1395 63.0304 66.3448 62.4326 66L61.1934 65.2852C60.6443 65.819 59.9759 66.2023 59.251 66.4082V67.833C59.251 68.5232 58.6911 69.0827 58.001 69.083C57.3106 69.083 56.751 68.5234 56.751 67.833V66.4082C56.0258 66.2025 55.3571 65.82 54.8076 65.2861L53.5723 66C52.9744 66.3447 52.2092 66.1397 51.8643 65.542C51.5195 64.9442 51.7247 64.1791 52.3223 63.834L53.5557 63.1221C53.4638 62.7582 53.417 62.3815 53.417 62C53.417 61.6181 53.4636 61.241 53.5557 60.877L52.3223 60.166C51.7247 59.8209 51.5195 59.0558 51.8643 58.458C52.2092 57.8603 52.9744 57.6553 53.5723 58L54.8076 58.7129C55.357 58.1794 56.0261 57.7973 56.751 57.5918V56.167C56.751 55.4766 57.3106 54.917 58.001 54.917ZM58 59.917C57.4477 59.9171 56.9179 60.1369 56.5273 60.5273C56.1367 60.918 55.9171 61.4476 55.917 62C55.917 62.5525 56.1366 63.0829 56.5273 63.4736C56.9157 63.8618 57.4414 64.0805 57.9902 64.083H58.0098C58.5586 64.0803 59.0854 63.8619 59.4736 63.4736C59.8642 63.083 60.084 62.5524 60.084 62C60.0839 61.4478 59.864 60.9179 59.4736 60.5273C59.083 60.1368 58.5524 59.9171 58 59.917Z" fill="var(--uafy-settings-button-icon, #a5a5a5)"/>
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M33.0996 38.7129C34.49 36.403 36.2207 34.6201 38.29 33.3633C40.3593 32.1065 42.6869 31.4776 45.2734 31.4775C47.9571 31.4775 50.334 32.1233 52.4033 33.4141C54.4727 34.671 56.0899 36.4547 57.2539 38.7646C58.4179 41.0406 59 43.7074 59 46.7646C59 48.6513 58.7727 50.3989 58.3193 52.0078C58.2133 52.0045 58.1069 52 58 52C52.5568 52 48.1315 56.349 48.0049 61.7617C47.1328 61.9188 46.2223 62 45.2734 62C42.6869 61.9999 40.3593 61.371 38.29 60.1143C36.35 58.9359 34.7075 57.3103 33.3643 55.2363L33.0996 54.8154V61.2354H25V22H33.0996V38.7129ZM43.043 38.1016C41.5234 38.1016 40.0845 38.4755 38.7266 39.2227C37.3685 39.936 36.1714 40.9554 35.1367 42.2803C34.1344 43.5711 33.3427 45.0662 32.7607 46.7646C33.3427 48.4628 34.1345 49.9574 35.1367 51.248C36.1714 52.5389 37.3685 53.5583 38.7266 54.3057C40.0845 55.0189 41.5234 55.376 43.043 55.376C44.5302 55.3759 45.8556 55.0189 47.0195 54.3057C48.1836 53.5583 49.0896 52.5389 49.7363 51.248C50.4152 49.9573 50.7548 48.4629 50.7549 46.7646C50.7549 45.0662 50.4153 43.5711 49.7363 42.2803C49.0896 40.9554 48.1836 39.936 47.0195 39.2227C45.8556 38.4755 44.5301 38.1016 43.043 38.1016Z" fill="var(--uafy-settings-button-icon, #a5a5a5)"/>
+    settings: `<svg class="basify-topbar-settings-icon" role="img" width="48" height="48" viewBox="0 0 84 84" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="84" height="84" rx="42" fill="var(--basify-settings-button-bg, #1f1f1f)"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M58.001 54.917C58.6911 54.9173 59.251 55.4768 59.251 56.167V57.5918C59.9754 57.7975 60.6435 58.1807 61.1924 58.7139L62.4307 58C63.0284 57.6551 63.7924 57.8605 64.1377 58.458C64.4829 59.0559 64.2785 59.8208 63.6807 60.166L62.4443 60.8789C62.5361 61.2424 62.584 61.6188 62.584 62C62.584 62.3806 62.5358 62.7562 62.4443 63.1191L63.6816 63.834C64.2796 64.179 64.4846 64.944 64.1396 65.542C63.7945 66.1395 63.0304 66.3448 62.4326 66L61.1934 65.2852C60.6443 65.819 59.9759 66.2023 59.251 66.4082V67.833C59.251 68.5232 58.6911 69.0827 58.001 69.083C57.3106 69.083 56.751 68.5234 56.751 67.833V66.4082C56.0258 66.2025 55.3571 65.82 54.8076 65.2861L53.5723 66C52.9744 66.3447 52.2092 66.1397 51.8643 65.542C51.5195 64.9442 51.7247 64.1791 52.3223 63.834L53.5557 63.1221C53.4638 62.7582 53.417 62.3815 53.417 62C53.417 61.6181 53.4636 61.241 53.5557 60.877L52.3223 60.166C51.7247 59.8209 51.5195 59.0558 51.8643 58.458C52.2092 57.8603 52.9744 57.6553 53.5723 58L54.8076 58.7129C55.357 58.1794 56.0261 57.7973 56.751 57.5918V56.167C56.751 55.4766 57.3106 54.917 58.001 54.917ZM58 59.917C57.4477 59.9171 56.9179 60.1369 56.5273 60.5273C56.1367 60.918 55.9171 61.4476 55.917 62C55.917 62.5525 56.1366 63.0829 56.5273 63.4736C56.9157 63.8618 57.4414 64.0805 57.9902 64.083H58.0098C58.5586 64.0803 59.0854 63.8619 59.4736 63.4736C59.8642 63.083 60.084 62.5524 60.084 62C60.0839 61.4478 59.864 60.9179 59.4736 60.5273C59.083 60.1368 58.5524 59.9171 58 59.917Z" fill="var(--basify-settings-button-icon, #a5a5a5)"/>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M33.0996 38.7129C34.49 36.403 36.2207 34.6201 38.29 33.3633C40.3593 32.1065 42.6869 31.4776 45.2734 31.4775C47.9571 31.4775 50.334 32.1233 52.4033 33.4141C54.4727 34.671 56.0899 36.4547 57.2539 38.7646C58.4179 41.0406 59 43.7074 59 46.7646C59 48.6513 58.7727 50.3989 58.3193 52.0078C58.2133 52.0045 58.1069 52 58 52C52.5568 52 48.1315 56.349 48.0049 61.7617C47.1328 61.9188 46.2223 62 45.2734 62C42.6869 61.9999 40.3593 61.371 38.29 60.1143C36.35 58.9359 34.7075 57.3103 33.3643 55.2363L33.0996 54.8154V61.2354H25V22H33.0996V38.7129ZM43.043 38.1016C41.5234 38.1016 40.0845 38.4755 38.7266 39.2227C37.3685 39.936 36.1714 40.9554 35.1367 42.2803C34.1344 43.5711 33.3427 45.0662 32.7607 46.7646C33.3427 48.4628 34.1345 49.9574 35.1367 51.248C36.1714 52.5389 37.3685 53.5583 38.7266 54.3057C40.0845 55.0189 41.5234 55.376 43.043 55.376C44.5302 55.3759 45.8556 55.0189 47.0195 54.3057C48.1836 53.5583 49.0896 52.5389 49.7363 51.248C50.4152 49.9573 50.7548 48.4629 50.7549 46.7646C50.7549 45.0662 50.4153 43.5711 49.7363 42.2803C49.0896 40.9554 48.1836 39.936 47.0195 39.2227C45.8556 38.4755 44.5301 38.1016 43.043 38.1016Z" fill="var(--basify-settings-button-icon, #a5a5a5)"/>
     </svg>`,
     phonkersbaseLogoSvg: `<svg role="img" width="122" height="26" viewBox="0 0 122 26" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path fill-rule="evenodd" clip-rule="evenodd" d="M7.52761 9.57622V21.4494L10.0957 21.3584V16.4454C11.5525 16.5364 14.4299 15.8995 14.2858 12.6241C14.1416 9.34877 11.8979 9.21229 10.6814 9.34877L7.52761 9.57622ZM10.0957 14.8987V10.8955C10.7265 10.668 11.988 10.7135 11.988 12.7151C11.988 14.7167 10.7265 15.0048 10.0957 14.8987Z" fill="white"/>
@@ -1285,7 +1287,7 @@ class SettingsMenu {
     SettingsMenu.injectStyles();
 
     SettingsMenu.button = new Spicetify.Topbar.Button(
-      UAfyI18n.t("settingsTitle"),
+      BasifyI18n.t("settingsTitle"),
       SettingsMenu.icons.settings,
       SettingsMenu.open,
       false,
@@ -1301,7 +1303,7 @@ class SettingsMenu {
 
       if (!buttonElement) return;
 
-      buttonElement.classList.add("uafy-topbar-settings-button-wrapper");
+      buttonElement.classList.add("basify-topbar-settings-button-wrapper");
 
       const innerButton = buttonElement.matches("button, [role='button']")
         ? buttonElement
@@ -1309,17 +1311,17 @@ class SettingsMenu {
 
       if (!innerButton) return;
 
-      innerButton.classList.add("uafy-topbar-settings-button");
+      innerButton.classList.add("basify-topbar-settings-button");
     });
   }
 
-  static updateLocalizedTitles(locale = UAfyI18n.getLocale()) {
+  static updateLocalizedTitles(locale = BasifyI18n.getLocale()) {
     SettingsMenu.updateButtonTitle(locale);
     SettingsMenu.updateModalTitle(locale);
   }
 
-  static updateButtonTitle(locale = UAfyI18n.getLocale()) {
-    const title = UAfyI18n.t("settingsTitle", locale);
+  static updateButtonTitle(locale = BasifyI18n.getLocale()) {
+    const title = BasifyI18n.t("settingsTitle", locale);
 
     if (!SettingsMenu.button) return;
 
@@ -1334,11 +1336,13 @@ class SettingsMenu {
     });
   }
 
-  static updateModalTitle(locale = UAfyI18n.getLocale()) {
-    const title = UAfyI18n.t("settingsTitle", locale);
+  static updateModalTitle(locale = BasifyI18n.getLocale()) {
+    const title = BasifyI18n.t("settingsTitle", locale);
 
     requestAnimationFrame(() => {
-      const settingsRoot = document.querySelector(".uafy-settings-react-root");
+      const settingsRoot = document.querySelector(
+        ".basify-settings-react-root",
+      );
 
       if (!settingsRoot) return;
 
@@ -1366,10 +1370,10 @@ class SettingsMenu {
     const ReactDOM = Spicetify.ReactDOM;
 
     const container = document.createElement("div");
-    container.className = "uafy-settings-react-root";
+    container.className = "basify-settings-react-root";
 
     Spicetify.PopupModal.display({
-      title: UAfyI18n.t("settingsTitle"),
+      title: BasifyI18n.t("settingsTitle"),
       content: container,
       isLarge: true,
     });
@@ -1410,7 +1414,7 @@ class SettingsMenu {
 
     if (emojiFlagsChanged || localeChanged) {
       refreshCurrentArtistPage().catch((error) => {
-        console.warn("UAfy failed to refresh artist page:", error);
+        console.warn("Basify failed to refresh artist page:", error);
       });
     }
 
@@ -1432,7 +1436,7 @@ class SettingsMenu {
     });
 
     const t = (key) => {
-      return UAfyI18n.t(key, settings.locale);
+      return BasifyI18n.t(key, settings.locale);
     };
 
     const saveSettings = async (newSettings) => {
@@ -1447,7 +1451,7 @@ class SettingsMenu {
 
       SettingsMenu.applyRuntimeSettings(updatedSettings, newSettings).catch(
         (error) => {
-          console.error("UAfy failed to apply runtime settings:", error);
+          console.error("Basify failed to apply runtime settings:", error);
         },
       );
     };
@@ -1460,14 +1464,14 @@ class SettingsMenu {
       SettingsMenu.applyRuntimeSettings(defaultSettings, defaultSettings).catch(
         (error) => {
           console.error(
-            "UAfy failed to apply runtime settings after reset:",
+            "Basify failed to apply runtime settings after reset:",
             error,
           );
         },
       );
 
       Spicetify.showNotification(
-        UAfyI18n.t("settingsResetNotification", defaultSettings.locale),
+        BasifyI18n.t("settingsResetNotification", defaultSettings.locale),
       );
     };
 
@@ -1487,7 +1491,7 @@ class SettingsMenu {
     return React.createElement(
       "div",
       {
-        className: "uafy-settings-menu",
+        className: "basify-settings-menu",
       },
 
       React.createElement(SettingsMenu.SectionTitle, {
@@ -1699,8 +1703,8 @@ class SettingsMenu {
       }),
 
       React.createElement(SettingsMenu.ButtonRow, {
-        label: t("clearUafyData"),
-        description: t("clearUafyDataDescription"),
+        label: t("clearBasifyData"),
+        description: t("clearBasifyDataDescription"),
         buttonText: t("resetButton"),
         onClick: resetSettings,
       }),
@@ -1715,7 +1719,7 @@ class SettingsMenu {
     return Spicetify.React.createElement(
       "h2",
       {
-        className: "uafy-settings-section-title",
+        className: "basify-settings-section-title",
       },
       title,
     );
@@ -1725,7 +1729,7 @@ class SettingsMenu {
     return Spicetify.React.createElement(
       "div",
       {
-        className: "uafy-settings-subsection-title",
+        className: "basify-settings-subsection-title",
       },
       title,
     );
@@ -1738,7 +1742,7 @@ class SettingsMenu {
     return React.createElement(
       "div",
       {
-        className: `uafy-settings-row${disabled ? " is-disabled" : ""}`,
+        className: `basify-settings-row${disabled ? " is-disabled" : ""}`,
       },
 
       React.createElement(SettingsMenu.RowText, {
@@ -1767,7 +1771,7 @@ class SettingsMenu {
     return React.createElement(
       "div",
       {
-        className: "uafy-settings-row",
+        className: "basify-settings-row",
       },
 
       React.createElement(SettingsMenu.RowText, {
@@ -1778,7 +1782,7 @@ class SettingsMenu {
       React.createElement(
         "select",
         {
-          className: "uafy-settings-select",
+          className: "basify-settings-select",
           value,
           onChange: (event) => {
             onChange(event.target.value);
@@ -1838,7 +1842,7 @@ class SettingsMenu {
     return React.createElement(
       "div",
       {
-        className: `uafy-settings-row${disabled ? " is-disabled" : ""}`,
+        className: `basify-settings-row${disabled ? " is-disabled" : ""}`,
       },
 
       React.createElement(SettingsMenu.RowText, {
@@ -1847,7 +1851,7 @@ class SettingsMenu {
       }),
 
       React.createElement("input", {
-        className: "uafy-settings-number",
+        className: "basify-settings-number",
         type: "number",
         min,
         max,
@@ -1883,7 +1887,7 @@ class SettingsMenu {
     return React.createElement(
       "div",
       {
-        className: "uafy-settings-row",
+        className: "basify-settings-row",
       },
 
       React.createElement(SettingsMenu.RowText, {
@@ -1895,7 +1899,7 @@ class SettingsMenu {
         "button",
         {
           className:
-            "Button-sc-qlcn5g-0 Button-small-buttonSecondary-useBrowserDefaultFocusStyle uafy-settings-button",
+            "Button-sc-qlcn5g-0 Button-small-buttonSecondary-useBrowserDefaultFocusStyle basify-settings-button",
           type: "button",
           onClick,
         },
@@ -1910,13 +1914,13 @@ class SettingsMenu {
     return React.createElement(
       "div",
       {
-        className: "uafy-settings-text-wrapper",
+        className: "basify-settings-text-wrapper",
       },
 
       React.createElement(
         "div",
         {
-          className: "uafy-settings-label",
+          className: "basify-settings-label",
         },
         label,
       ),
@@ -1925,7 +1929,7 @@ class SettingsMenu {
         ? React.createElement(
             "div",
             {
-              className: "uafy-settings-description",
+              className: "basify-settings-description",
             },
             description,
           )
@@ -1936,32 +1940,32 @@ class SettingsMenu {
   static InfoSection({ locale }) {
     const React = Spicetify.React;
 
-    const phonkersbaseLocale = UAfyI18n.getPhonkersbaseLocalePath(locale);
+    const phonkersbaseLocale = BasifyI18n.getPhonkersbaseLocalePath(locale);
     const phonkersbaseUrl = `https://www.phonkersbase.com/${phonkersbaseLocale}`;
     const githubUrl = "https://github.com/I2oman";
 
     return React.createElement(
       "div",
       {
-        className: "uafy-settings-info-section",
+        className: "basify-settings-info-section",
       },
 
       React.createElement(
         "div",
         {
-          className: "uafy-settings-info-powered",
+          className: "basify-settings-info-powered",
         },
 
         React.createElement(
           "span",
           {
-            className: "uafy-settings-info-powered-label",
+            className: "basify-settings-info-powered-label",
           },
-          UAfyI18n.t("poweredBy", locale),
+          BasifyI18n.t("poweredBy", locale),
         ),
 
         React.createElement("span", {
-          className: "uafy-settings-info-logo",
+          className: "basify-settings-info-logo",
           dangerouslySetInnerHTML: {
             __html: SettingsMenu.icons.phonkersbaseLogoSvg,
           },
@@ -1971,10 +1975,10 @@ class SettingsMenu {
       React.createElement(
         "div",
         {
-          className: "uafy-settings-info-line",
+          className: "basify-settings-info-line",
         },
 
-        UAfyI18n.t("allInformationTakenFrom", locale),
+        BasifyI18n.t("allInformationTakenFrom", locale),
         " ",
 
         React.createElement(
@@ -1991,10 +1995,10 @@ class SettingsMenu {
       React.createElement(
         "div",
         {
-          className: "uafy-settings-info-line",
+          className: "basify-settings-info-line",
         },
 
-        UAfyI18n.t("createdBy", locale),
+        BasifyI18n.t("createdBy", locale),
         " ",
 
         React.createElement(
@@ -2017,18 +2021,18 @@ class SettingsMenu {
     style.id = SettingsMenu.styleElementId;
 
     style.textContent = `
-      .uafy-settings-react-root {
+      .basify-settings-react-root {
         min-width: 460px;
       }
 
-      .uafy-settings-menu {
+      .basify-settings-menu {
         display: flex;
         flex-direction: column;
         gap: 10px;
         padding: 4px 0 18px;
       }
 
-      .uafy-settings-section-title {
+      .basify-settings-section-title {
         margin: 18px 0 4px;
         padding-bottom: 8px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.18);
@@ -2037,7 +2041,7 @@ class SettingsMenu {
         font-weight: 700;
       }
 
-      .uafy-settings-subsection-title {
+      .basify-settings-subsection-title {
         margin-top: 6px;
         color: var(--spice-subtext);
         font-size: 13px;
@@ -2046,7 +2050,7 @@ class SettingsMenu {
         letter-spacing: 0.04em;
       }
 
-      .uafy-settings-row {
+      .basify-settings-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -2054,36 +2058,36 @@ class SettingsMenu {
         min-height: 42px;
       }
 
-      .uafy-settings-row.is-disabled {
+      .basify-settings-row.is-disabled {
         opacity: 0.45;
       }
 
-      .uafy-settings-row.is-disabled [role="switch"],
-      .uafy-settings-row.is-disabled button {
+      .basify-settings-row.is-disabled [role="switch"],
+      .basify-settings-row.is-disabled button {
         pointer-events: none;
         filter: grayscale(1);
       }
 
-      .uafy-settings-text-wrapper {
+      .basify-settings-text-wrapper {
         display: flex;
         flex-direction: column;
         gap: 3px;
         min-width: 0;
       }
 
-      .uafy-settings-label {
+      .basify-settings-label {
         color: var(--spice-text);
         font-size: 14px;
         font-weight: 600;
       }
 
-      .uafy-settings-description {
+      .basify-settings-description {
         color: var(--spice-subtext);
         font-size: 12px;
         line-height: 1.35;
       }
 
-      .uafy-settings-number {
+      .basify-settings-number {
         width: 80px;
         padding: 8px 10px;
         border: 1px solid rgba(255, 255, 255, 0.24);
@@ -2094,7 +2098,7 @@ class SettingsMenu {
         font-weight: 600;
       }
 
-      .uafy-settings-select {
+      .basify-settings-select {
         min-width: 130px;
         padding: 8px 10px;
         border: 1px solid rgba(255, 255, 255, 0.24);
@@ -2106,7 +2110,7 @@ class SettingsMenu {
         cursor: pointer;
       }
 
-      .uafy-settings-button {
+      .basify-settings-button {
         min-width: 90px;
         height: 40px;
         border-radius: 999px;
@@ -2118,54 +2122,54 @@ class SettingsMenu {
         cursor: pointer;
       }
 
-      .uafy-settings-info-section {
+      .basify-settings-info-section {
         margin-top: 4px;
         padding-top: 12px;
         border-top: 1px solid rgba(255, 255, 255, 0.18);
       }
 
-      .uafy-settings-info-powered {
+      .basify-settings-info-powered {
         display: flex;
         align-items: center;
         gap: 8px;
         min-height: 26px;
       }
 
-      .uafy-settings-info-powered-label {
+      .basify-settings-info-powered-label {
         color: var(--spice-text);
         font-size: 13px;
         font-weight: 700;
       }
 
-      .uafy-settings-info-logo {
+      .basify-settings-info-logo {
         display: inline-flex;
         align-items: center;
         height: 26px;
       }
 
-      .uafy-settings-info-logo svg {
+      .basify-settings-info-logo svg {
         width: 100px;
         height: auto;
         display: block;
       }
 
-      .uafy-settings-info-line {
+      .basify-settings-info-line {
         margin-top: 5px;
         color: var(--spice-subtext);
         font-size: 12px;
         line-height: 1.35;
       }
 
-      .uafy-settings-info-line a {
+      .basify-settings-info-line a {
         color: var(--spice-button);
         text-decoration: none;
       }
 
-      .uafy-settings-info-line a:hover {
+      .basify-settings-info-line a:hover {
         text-decoration: underline;
       }
 
-      .uafy-topbar-settings-button {
+      .basify-topbar-settings-button {
         width: 48px !important;
         height: 48px !important;
         min-width: 48px !important;
@@ -2180,19 +2184,19 @@ class SettingsMenu {
         align-items: center !important;
         justify-content: center !important;
 
-        --uafy-settings-button-bg: #1f1f1f;
-        --uafy-settings-button-icon: #a5a5a5;
+        --basify-settings-button-bg: #1f1f1f;
+        --basify-settings-button-icon: #a5a5a5;
       }
 
-      .uafy-topbar-settings-button:hover {
+      .basify-topbar-settings-button:hover {
         background: transparent !important;
 
-        --uafy-settings-button-bg: #2a2a2a;
-        --uafy-settings-button-icon: #ffffff;
+        --basify-settings-button-bg: #2a2a2a;
+        --basify-settings-button-icon: #ffffff;
       }
 
-      .uafy-topbar-settings-button svg,
-      .uafy-topbar-settings-icon {
+      .basify-topbar-settings-button svg,
+      .basify-topbar-settings-icon {
         width: 48px !important;
         height: 48px !important;
         display: block !important;
@@ -2200,7 +2204,7 @@ class SettingsMenu {
         flex: 0 0 auto !important;
       }
       
-      .uafy-topbar-settings-button-wrapper {
+      .basify-topbar-settings-button-wrapper {
         margin-left: 12px !important;
       }
     `;
@@ -2210,8 +2214,8 @@ class SettingsMenu {
 }
 
 class SkipToastRenderer {
-  static styleElementId = "uafy-skip-toast-style";
-  static containerClassName = "uafy-skip-toast-container";
+  static styleElementId = "basify-skip-toast-style";
+  static containerClassName = "basify-skip-toast-container";
   static toastTimeouts = new WeakMap();
 
   static async show(track) {
@@ -2271,7 +2275,9 @@ class SkipToastRenderer {
     if (!container) return;
 
     if (Object.hasOwn(changedSettings, "popupDurationMs")) {
-      const toasts = Array.from(container.querySelectorAll(".uafy-skip-toast"));
+      const toasts = Array.from(
+        container.querySelectorAll(".basify-skip-toast"),
+      );
 
       toasts.forEach((toast) => {
         SkipToastRenderer.scheduleToastRemoval(toast);
@@ -2286,7 +2292,7 @@ class SkipToastRenderer {
 
   static removeExtraToastsBeforeAppend(container) {
     const maxToastCount = SkipToastRenderer.getVisibleToastLimit() + 1;
-    const toasts = Array.from(container.querySelectorAll(".uafy-skip-toast"));
+    const toasts = Array.from(container.querySelectorAll(".basify-skip-toast"));
 
     while (toasts.length >= maxToastCount) {
       const oldestToast = toasts.shift();
@@ -2297,7 +2303,7 @@ class SkipToastRenderer {
 
   static updateToastStack(container) {
     const visibleToastLimit = SkipToastRenderer.getVisibleToastLimit();
-    const toasts = Array.from(container.querySelectorAll(".uafy-skip-toast"));
+    const toasts = Array.from(container.querySelectorAll(".basify-skip-toast"));
 
     toasts.forEach((toast) => {
       toast.classList.remove("is-fading-away");
@@ -2325,19 +2331,19 @@ class SkipToastRenderer {
 
   static createToast(track, dominantColor) {
     const toast = document.createElement("div");
-    toast.className = "uafy-skip-toast";
+    toast.className = "basify-skip-toast";
 
     SkipToastRenderer.applyDominantColorBackground(toast, dominantColor);
 
     const header = document.createElement("div");
-    header.className = "uafy-skip-toast-header";
+    header.className = "basify-skip-toast-header";
 
     const title = document.createElement("div");
-    title.className = "uafy-skip-toast-title";
-    title.textContent = UAfyI18n.t("trackSkipped");
+    title.className = "basify-skip-toast-title";
+    title.textContent = BasifyI18n.t("trackSkipped");
 
     const closeButton = document.createElement("button");
-    closeButton.className = "uafy-skip-toast-close";
+    closeButton.className = "basify-skip-toast-close";
     closeButton.type = "button";
     closeButton.textContent = "×";
 
@@ -2348,11 +2354,11 @@ class SkipToastRenderer {
     header.append(title, closeButton);
 
     const trackName = document.createElement("div");
-    trackName.className = "uafy-skip-toast-track";
+    trackName.className = "basify-skip-toast-track";
     trackName.textContent = track.name;
 
     const artistsWrapper = document.createElement("div");
-    artistsWrapper.className = "uafy-skip-toast-artists";
+    artistsWrapper.className = "basify-skip-toast-artists";
 
     const skipReasons = track.getSkipReasons();
 
@@ -2395,12 +2401,12 @@ class SkipToastRenderer {
 
   static createArtistReasonRow(artist, labels) {
     const row = document.createElement("div");
-    row.className = "uafy-skip-toast-artist-row";
+    row.className = "basify-skip-toast-artist-row";
 
     const artistName = document.createElement("button");
-    artistName.className = "uafy-skip-toast-artist-name";
+    artistName.className = "basify-skip-toast-artist-name";
     artistName.type = "button";
-    artistName.textContent = artist?.name || UAfyI18n.t("unknownArtist");
+    artistName.textContent = artist?.name || BasifyI18n.t("unknownArtist");
 
     if (artist?.id) {
       artistName.addEventListener("click", (event) => {
@@ -2410,13 +2416,13 @@ class SkipToastRenderer {
     }
 
     const badgesWrapper = document.createElement("div");
-    badgesWrapper.className = "uafy-skip-toast-badges";
+    badgesWrapper.className = "basify-skip-toast-badges";
 
     const uniqueLabels = [...new Set(labels)];
 
     uniqueLabels.forEach((label) => {
       const badge = ArtistInfoSectionRenderer.createTrustBadge(label);
-      badge.classList.add("uafy-skip-toast-badge");
+      badge.classList.add("basify-skip-toast-badge");
 
       badgesWrapper.appendChild(badge);
     });
@@ -2428,18 +2434,18 @@ class SkipToastRenderer {
 
   static createDistributorReasonRow(distributorName, label) {
     const row = document.createElement("div");
-    row.className = "uafy-skip-toast-artist-row";
+    row.className = "basify-skip-toast-artist-row";
 
     const distributor = document.createElement("div");
-    distributor.className = "uafy-skip-toast-distributor-name";
+    distributor.className = "basify-skip-toast-distributor-name";
     distributor.textContent =
-      distributorName || UAfyI18n.t("unknownDistributor");
+      distributorName || BasifyI18n.t("unknownDistributor");
 
     const badgesWrapper = document.createElement("div");
-    badgesWrapper.className = "uafy-skip-toast-badges";
+    badgesWrapper.className = "basify-skip-toast-badges";
 
     const badge = ArtistInfoSectionRenderer.createTrustBadge(label);
-    badge.classList.add("uafy-skip-toast-badge");
+    badge.classList.add("basify-skip-toast-badge");
 
     badgesWrapper.appendChild(badge);
 
@@ -2505,7 +2511,7 @@ class SkipToastRenderer {
 
     if (!container) return;
 
-    container.querySelectorAll(".uafy-skip-toast").forEach((toast) => {
+    container.querySelectorAll(".basify-skip-toast").forEach((toast) => {
       SkipToastRenderer.removeToast(toast, false);
     });
 
@@ -2519,7 +2525,7 @@ class SkipToastRenderer {
     style.id = SkipToastRenderer.styleElementId;
 
     style.textContent = `
-      .uafy-skip-toast-container {
+      .basify-skip-toast-container {
         position: fixed;
         right: 24px;
         bottom: 112px;
@@ -2533,7 +2539,7 @@ class SkipToastRenderer {
         pointer-events: none;
       }
 
-      .uafy-skip-toast {
+      .basify-skip-toast {
         display: flex;
         flex-direction: column;
         width: fit-content;
@@ -2553,17 +2559,17 @@ class SkipToastRenderer {
         overflow: hidden;
       }
 
-      .uafy-skip-toast.is-visible {
+      .basify-skip-toast.is-visible {
         opacity: 1;
         transform: translateY(0) scale(1);
       }
 
-      .uafy-skip-toast.is-removing {
+      .basify-skip-toast.is-removing {
         opacity: 0;
         transform: translateY(12px) scale(0.98);
       }
 
-      .uafy-skip-toast.is-fading-away {
+      .basify-skip-toast.is-fading-away {
         -webkit-mask-image: linear-gradient(
           to bottom,
           transparent 0%,
@@ -2584,14 +2590,14 @@ class SkipToastRenderer {
         );
       }
 
-      .uafy-skip-toast-header {
+      .basify-skip-toast-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
       }
 
-      .uafy-skip-toast-title {
+      .basify-skip-toast-title {
         text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
         font-size: 13px;
         font-weight: 700;
@@ -2600,7 +2606,7 @@ class SkipToastRenderer {
         letter-spacing: 0.04em;
       }
 
-      .uafy-skip-toast-close {
+      .basify-skip-toast-close {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -2615,24 +2621,24 @@ class SkipToastRenderer {
         cursor: pointer;
       }
 
-      .uafy-skip-toast-close:hover {
+      .basify-skip-toast-close:hover {
         background: rgba(255, 255, 255, 0.08);
         color: var(--spice-text, #ffffff);
       }
 
-      .uafy-skip-toast-track {
+      .basify-skip-toast-track {
         font-size: 18px;
         font-weight: 800;
         line-height: 1.25;
       }
 
-      .uafy-skip-toast-artists {
+      .basify-skip-toast-artists {
         display: flex;
         flex-direction: column;
         gap: 10px;
       }
 
-      .uafy-skip-toast-artist-row {
+      .basify-skip-toast-artist-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -2642,7 +2648,7 @@ class SkipToastRenderer {
         background: rgba(255, 255, 255, 0.06);
       }
 
-      .uafy-skip-toast-artist-name {
+      .basify-skip-toast-artist-name {
         min-width: 0;
         flex: 1;
         border: 0;
@@ -2659,12 +2665,12 @@ class SkipToastRenderer {
         cursor: pointer;
       }
 
-      .uafy-skip-toast-artist-name:hover {
+      .basify-skip-toast-artist-name:hover {
         color: var(--spice-button, #1ed760);
         text-decoration: underline;
       }
 
-      .uafy-skip-toast-distributor-name {
+      .basify-skip-toast-distributor-name {
         min-width: 0;
         flex: 1;
         color: var(--spice-text, #ffffff);
@@ -2676,7 +2682,7 @@ class SkipToastRenderer {
         text-overflow: ellipsis;
       }
 
-      .uafy-skip-toast-badges {
+      .basify-skip-toast-badges {
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -2685,12 +2691,12 @@ class SkipToastRenderer {
         flex: 0 0 auto;
       }
 
-      .uafy-skip-toast-badge {
+      .basify-skip-toast-badge {
         font-size: 12px !important;
         padding: 5px 8px !important;
       }
 
-      .uafy-skip-toast-badge svg {
+      .basify-skip-toast-badge svg {
         width: 16px !important;
         height: 16px !important;
       }
@@ -2745,9 +2751,12 @@ class PlaybackDeviceMonitor {
         ? `${device.isLocal ? "local" : "remote"} ${device.type}: ${device.name}`
         : "No active device";
 
-      console.log(`[UAfy] ${reason}`);
-      console.log("[UAfy] Active device:", deviceLabel);
-      console.log("[UAfy] Playing on current device:", playingOnCurrentDevice);
+      console.log(`[Basify] ${reason}`);
+      console.log("[Basify] Active device:", deviceLabel);
+      console.log(
+        "[Basify] Playing on current device:",
+        playingOnCurrentDevice,
+      );
     }
 
     if (startedPlayingOnCurrentDevice) {
@@ -2767,8 +2776,8 @@ class PlaybackDeviceMonitor {
 }
 
 class NowPlayingThemeOverlayRenderer {
-  static styleElementId = "uafy-now-playing-theme-overlay-style";
-  static overlayElementId = "uafy-now-playing-theme-overlay";
+  static styleElementId = "basify-now-playing-theme-overlay-style";
+  static overlayElementId = "basify-now-playing-theme-overlay";
 
   static applyFromTrack(track) {
     const settings = LocalStorageManager.getSettings();
@@ -2809,7 +2818,7 @@ class NowPlayingThemeOverlayRenderer {
     }
 
     overlay.dataset.status = themeStatus;
-    overlay.style.setProperty("--uafy-now-playing-color", themeColor);
+    overlay.style.setProperty("--basify-now-playing-color", themeColor);
   }
 
   static clear() {
@@ -2839,7 +2848,7 @@ class NowPlayingThemeOverlayRenderer {
         overflow: hidden;
       }
 
-      .Root__now-playing-bar #uafy-now-playing-theme-overlay {
+      .Root__now-playing-bar #basify-now-playing-theme-overlay {
         position: absolute;
         inset: 0;
         z-index: 0;
@@ -2848,24 +2857,24 @@ class NowPlayingThemeOverlayRenderer {
         mix-blend-mode: screen;
         contain: strict;
         background:
-          radial-gradient(circle at left center, color-mix(in srgb, var(--uafy-now-playing-color) 95%, transparent) 0%, color-mix(in srgb, var(--uafy-now-playing-color) 75%, transparent) 8%, transparent 22%),
-          radial-gradient(circle at right center, color-mix(in srgb, var(--uafy-now-playing-color) 95%, transparent) 0%, color-mix(in srgb, var(--uafy-now-playing-color) 75%, transparent) 8%, transparent 22%),
-          linear-gradient(90deg, color-mix(in srgb, var(--uafy-now-playing-color) 45%, transparent) 0%, transparent 28%, transparent 72%, color-mix(in srgb, var(--uafy-now-playing-color) 45%, transparent) 100%);
+          radial-gradient(circle at left center, color-mix(in srgb, var(--basify-now-playing-color) 95%, transparent) 0%, color-mix(in srgb, var(--basify-now-playing-color) 75%, transparent) 8%, transparent 22%),
+          radial-gradient(circle at right center, color-mix(in srgb, var(--basify-now-playing-color) 95%, transparent) 0%, color-mix(in srgb, var(--basify-now-playing-color) 75%, transparent) 8%, transparent 22%),
+          linear-gradient(90deg, color-mix(in srgb, var(--basify-now-playing-color) 45%, transparent) 0%, transparent 28%, transparent 72%, color-mix(in srgb, var(--basify-now-playing-color) 45%, transparent) 100%);
       }
 
-      .Root__now-playing-bar > :not(#uafy-now-playing-theme-overlay) {
+      .Root__now-playing-bar > :not(#basify-now-playing-theme-overlay) {
         position: relative;
         z-index: 1;
       }
 
-      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="approved"],
-      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="pride"],
-      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="base"] {
+      .Root__now-playing-bar #basify-now-playing-theme-overlay[data-status="approved"],
+      .Root__now-playing-bar #basify-now-playing-theme-overlay[data-status="pride"],
+      .Root__now-playing-bar #basify-now-playing-theme-overlay[data-status="base"] {
         opacity: 0.68;
       }
 
-      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="unknown"],
-      .Root__now-playing-bar #uafy-now-playing-theme-overlay[data-status="noInfo"] {
+      .Root__now-playing-bar #basify-now-playing-theme-overlay[data-status="unknown"],
+      .Root__now-playing-bar #basify-now-playing-theme-overlay[data-status="noInfo"] {
         opacity: 0.58;
       }
     `;
@@ -2875,13 +2884,13 @@ class NowPlayingThemeOverlayRenderer {
 }
 
 class ArtistPageHeaderRenderer {
-  static styleElementId = "uafy-artist-page-header-style";
+  static styleElementId = "basify-artist-page-header-style";
 
   static apply(artistHeaderElement, artist) {
     ArtistPageHeaderRenderer.injectStyles();
 
     artistHeaderElement.style.removeProperty("height");
-    artistHeaderElement.classList.add("uafy-artist-header-wrapper");
+    artistHeaderElement.classList.add("basify-artist-header-wrapper");
 
     ArtistPageHeaderRenderer.resetTitleStyles(artistHeaderElement);
 
@@ -2891,7 +2900,7 @@ class ArtistPageHeaderRenderer {
 
     if (!headerTextElement) return;
 
-    artistHeaderElement.querySelector(".uafy-artist-info-section")?.remove();
+    artistHeaderElement.querySelector(".basify-artist-info-section")?.remove();
 
     const artistInfoSection =
       ArtistInfoSectionRenderer.createArtistInfoSection(artist);
@@ -2922,7 +2931,7 @@ class ArtistPageHeaderRenderer {
     style.id = ArtistPageHeaderRenderer.styleElementId;
 
     style.textContent = `
-      .main-entityHeader-imageContainerWrapper.uafy-artist-header-wrapper {
+      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper {
         height: auto !important;
         min-height: clamp(
           128px,
@@ -2933,28 +2942,28 @@ class ArtistPageHeaderRenderer {
         display: flex;
       }
 
-      .main-entityHeader-imageContainerWrapper.uafy-artist-header-wrapper
+      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper
       .main-entityHeader-headerText {
         min-width: 0;
         max-width: 100%;
       }
 
-      .main-entityHeader-imageContainerWrapper.uafy-artist-header-wrapper
+      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper
       .main-entityHeader-title {
         max-width: 100%;
       }
 
-      .main-entityHeader-imageContainerWrapper.uafy-artist-header-wrapper
+      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper
       .main-entityHeader-title,
-      .main-entityHeader-imageContainerWrapper.uafy-artist-header-wrapper
+      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper
       .main-entityHeader-title * {
         white-space: nowrap !important;
         overflow-wrap: normal !important;
         word-break: normal !important;
       }
 
-      .main-entityHeader-imageContainerWrapper.uafy-artist-header-wrapper
-      .uafy-artist-info-section {
+      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper
+      .basify-artist-info-section {
         margin-top: 12px !important;
       }
     `;
@@ -2964,7 +2973,7 @@ class ArtistPageHeaderRenderer {
 }
 
 class NowPlayingArtistRenderer {
-  static styleElementId = "uafy-now-playing-artist-style";
+  static styleElementId = "basify-now-playing-artist-style";
 
   static labelPriority = [
     "blocked",
@@ -3007,20 +3016,20 @@ class NowPlayingArtistRenderer {
     },
   };
 
-  static render(uafyTrack, artistSpans) {
+  static render(basifyTrack, artistSpans) {
     const settings = LocalStorageManager.getSettings();
 
     NowPlayingArtistRenderer.injectStyles();
 
     NowPlayingArtistRenderer.renderArtistSpanGroup(
       artistSpans.bottomBarArtistSpans,
-      uafyTrack.artists,
+      basifyTrack.artists,
       settings,
     );
 
     NowPlayingArtistRenderer.renderArtistSpanGroup(
       artistSpans.sideViewArtistSpans,
-      uafyTrack.artists,
+      basifyTrack.artists,
       settings,
     );
   }
@@ -3043,9 +3052,9 @@ class NowPlayingArtistRenderer {
       const artistLink = artistSpan.querySelector("a") || artistSpan;
 
       if (settings.formatNowPlayingArtistName && statusStyle?.color) {
-        artistLink.classList.add("uafy-now-playing-artist-name");
+        artistLink.classList.add("basify-now-playing-artist-name");
         artistLink.style.setProperty(
-          "--uafy-artist-status-color",
+          "--basify-artist-status-color",
           statusStyle.color,
         );
       }
@@ -3060,7 +3069,7 @@ class NowPlayingArtistRenderer {
         artist.countries.forEach((country) => {
           const flagElement = country.flagImg(settings.emojiFlags, 4, 12, 16);
 
-          flagElement.classList.add("uafy-artist-flag");
+          flagElement.classList.add("basify-artist-flag");
 
           artistSpan.appendChild(flagElement);
         });
@@ -3069,20 +3078,20 @@ class NowPlayingArtistRenderer {
   }
 
   static resetArtistSpan(artistSpan) {
-    artistSpan.querySelectorAll(".uafy-artist-flag").forEach((flag) => {
+    artistSpan.querySelectorAll(".basify-artist-flag").forEach((flag) => {
       flag.remove();
     });
 
     artistSpan
-      .querySelectorAll(".uafy-artist-status-shape")
+      .querySelectorAll(".basify-artist-status-shape")
       .forEach((shape) => {
         shape.remove();
       });
 
     const artistLink = artistSpan.querySelector("a") || artistSpan;
 
-    artistLink.classList.remove("uafy-now-playing-artist-name");
-    artistLink.style.removeProperty("--uafy-artist-status-color");
+    artistLink.classList.remove("basify-now-playing-artist-name");
+    artistLink.style.removeProperty("--basify-artist-status-color");
   }
 
   static getDominantArtistLabel(artist) {
@@ -3102,10 +3111,10 @@ class NowPlayingArtistRenderer {
 
     const shape = document.createElement("span");
 
-    shape.classList.add("uafy-artist-status-shape");
+    shape.classList.add("basify-artist-status-shape");
     shape.dataset.status = label;
     shape.dataset.shape = statusStyle.shape;
-    shape.style.setProperty("--uafy-artist-status-color", statusStyle.color);
+    shape.style.setProperty("--basify-artist-status-color", statusStyle.color);
 
     const iconSvg = NowPlayingArtistRenderer.statusIcons[statusStyle.shape];
 
@@ -3131,60 +3140,60 @@ class NowPlayingArtistRenderer {
     style.id = NowPlayingArtistRenderer.styleElementId;
 
     style.textContent = `
-      .uafy-now-playing-artist-name {
-        color: var(--uafy-artist-status-color) !important;
+      .basify-now-playing-artist-name {
+        color: var(--basify-artist-status-color) !important;
       }
 
-      .uafy-artist-flag{
+      .basify-artist-flag{
         margin-bottom: 2px
       }
 
-      .uafy-artist-status-shape {
+      .basify-artist-status-shape {
         display: inline-block;
         margin-left: 4px;
         vertical-align: middle;
         flex: 0 0 auto;
       }
 
-      .uafy-artist-status-shape[data-shape="square"] {
+      .basify-artist-status-shape[data-shape="square"] {
         width: 10px;
         height: 10px;
         border-radius: 2px;
-        background: var(--uafy-artist-status-color);
+        background: var(--basify-artist-status-color);
       }
 
-      .uafy-artist-status-shape[data-shape="circle"] {
+      .basify-artist-status-shape[data-shape="circle"] {
         width: 10px;
         height: 10px;
         border-radius: 50%;
-        background: var(--uafy-artist-status-color);
+        background: var(--basify-artist-status-color);
         margin-bottom: 3px;
       }
         
-      .uafy-artist-status-shape[data-shape="triangle"] {
+      .basify-artist-status-shape[data-shape="triangle"] {
         width: 0;
         height: 0;
         border-left: 5px solid transparent;
         border-right: 5px solid transparent;
-        border-bottom: 10px solid var(--uafy-artist-status-color);
+        border-bottom: 10px solid var(--basify-artist-status-color);
         margin-bottom: 4px;
       }
       
-      .uafy-artist-status-shape[data-shape="crown"],
-      .uafy-artist-status-shape[data-shape="star"],
-      .uafy-artist-status-shape[data-shape="world"] {
+      .basify-artist-status-shape[data-shape="crown"],
+      .basify-artist-status-shape[data-shape="star"],
+      .basify-artist-status-shape[data-shape="world"] {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         width: 14px;
         height: 14px;
-        color: var(--uafy-artist-status-color);
+        color: var(--basify-artist-status-color);
         margin-bottom: 2px;
       }
 
-      .uafy-artist-status-shape[data-shape="crown"] svg,
-      .uafy-artist-status-shape[data-shape="star"] svg,
-      .uafy-artist-status-shape[data-shape="world"] svg {
+      .basify-artist-status-shape[data-shape="crown"] svg,
+      .basify-artist-status-shape[data-shape="star"] svg,
+      .basify-artist-status-shape[data-shape="world"] svg {
         width: 14px;
         height: 14px;
         margin-left: 0 !important;
@@ -3249,20 +3258,20 @@ async function handleNowPlayingTrackChange(timeoutMs = 5000) {
   const spotifyTrack = await waitForCurrentSpotifyTrack(timeoutMs);
   const currentTrackUri = spotifyTrack.uri;
 
-  const { uafyTrack, artistSpans } =
+  const { basifyTrack, artistSpans } =
     await buildNowPlayingTrackContext(spotifyTrack);
 
   if (!isStillCurrentTrack(currentTrackUri)) {
     return;
   }
 
-  NowPlayingRuntimeState.update(uafyTrack, artistSpans);
+  NowPlayingRuntimeState.update(basifyTrack, artistSpans);
 
-  if (handleTrackSkipIfNeeded(uafyTrack)) {
+  if (handleTrackSkipIfNeeded(basifyTrack)) {
     return;
   }
 
-  renderNowPlayingTrack(uafyTrack, artistSpans);
+  renderNowPlayingTrack(basifyTrack, artistSpans);
 }
 
 async function waitForCurrentSpotifyTrack(timeoutMs = 5000) {
@@ -3280,7 +3289,7 @@ async function buildNowPlayingTrackContext(spotifyTrack) {
   const trackArtistsPromise = getTrackArtists(spotifyTrack);
   const artistSpansPromise = DomObserver.waitForNowPlayingArtist(spotifyTrack);
   const distributorsPromise =
-    UafyTrack.getDistributorsFromSpotifyTrack(spotifyTrack);
+    BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack);
 
   const [trackArtists, artistSpans, distributors] = await Promise.all([
     trackArtistsPromise,
@@ -3289,7 +3298,7 @@ async function buildNowPlayingTrackContext(spotifyTrack) {
   ]);
 
   return {
-    uafyTrack: new UafyTrack(spotifyTrack, trackArtists, distributors),
+    basifyTrack: new BasifyTrack(spotifyTrack, trackArtists, distributors),
     artistSpans,
   };
 }
@@ -3307,28 +3316,31 @@ function handleCurrentTrackSkipCheck(reason = "Playback state changed") {
   }
 
   handleNowPlayingTrackChange().catch((error) => {
-    console.error(`UAfy failed to check current track after ${reason}:`, error);
+    console.error(
+      `Basify failed to check current track after ${reason}:`,
+      error,
+    );
   });
 }
 
-function handleTrackSkipIfNeeded(uafyTrack) {
+function handleTrackSkipIfNeeded(basifyTrack) {
   if (!PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice()) {
     return false;
   }
 
-  if (!uafyTrack.shouldSkipTrack()) {
+  if (!basifyTrack.shouldSkipTrack()) {
     return false;
   }
 
-  SkipToastRenderer.show(uafyTrack);
+  SkipToastRenderer.show(basifyTrack);
   Spicetify.Player.next();
 
   return true;
 }
 
-function renderNowPlayingTrack(uafyTrack, artistSpans) {
-  NowPlayingThemeOverlayRenderer.applyFromTrack(uafyTrack);
-  NowPlayingArtistRenderer.render(uafyTrack, artistSpans);
+function renderNowPlayingTrack(basifyTrack, artistSpans) {
+  NowPlayingThemeOverlayRenderer.applyFromTrack(basifyTrack);
+  NowPlayingArtistRenderer.render(basifyTrack, artistSpans);
 }
 
 async function startup() {
@@ -3342,19 +3354,19 @@ async function startup() {
 
   startupResults.forEach((result) => {
     if (result.status === "rejected") {
-      console.warn("UAfy startup task failed:", result.reason);
+      console.warn("Basify startup task failed:", result.reason);
     }
   });
 }
 
 function main() {
   startup().catch((error) => {
-    console.error("UAfy startup failed:", error);
+    console.error("Basify startup failed:", error);
   });
 
   Spicetify.Player.addEventListener("songchange", () => {
     handleNowPlayingTrackChange().catch((error) => {
-      console.error("UAfy failed to update now playing flags:", error);
+      console.error("Basify failed to update now playing flags:", error);
     });
   });
 
@@ -3364,7 +3376,7 @@ function main() {
 
   Spicetify.Platform.History.listen((location) => {
     loadArtistPage(location).catch((error) => {
-      console.error("UAfy failed to load artist page:", error);
+      console.error("Basify failed to load artist page:", error);
     });
   });
 }
