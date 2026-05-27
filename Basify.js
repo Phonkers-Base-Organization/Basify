@@ -2353,9 +2353,17 @@ class SkipToastRenderer {
 
     header.append(title, closeButton);
 
-    const trackName = document.createElement("div");
+    const trackName = document.createElement("button");
     trackName.className = "basify-skip-toast-track";
+    trackName.type = "button";
     trackName.textContent = track.name;
+
+    if (track.id) {
+      trackName.addEventListener("click", (event) => {
+        event.stopPropagation();
+        Spicetify.Platform.History.push(`/track/${track.id}`);
+      });
+    }
 
     const artistsWrapper = document.createElement("div");
     artistsWrapper.className = "basify-skip-toast-artists";
@@ -2627,9 +2635,20 @@ class SkipToastRenderer {
       }
 
       .basify-skip-toast-track {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: var(--spice-text, #ffffff);
         font-size: 18px;
         font-weight: 800;
         line-height: 1.25;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .basify-skip-toast-track:hover {
+        color: var(--spice-button, #1ed760);
+        text-decoration: underline;
       }
 
       .basify-skip-toast-artists {
