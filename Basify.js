@@ -5,62 +5,64 @@ const BasifyLocales = {
     language: "Language",
     locale: "Locale",
     localeDescription:
-      "Choose the language used by Basify settings and messages.",
+      "Choose the language used in Basify settings and popup messages.",
 
     skipping: "Skipping",
     skipTracks: "Skip tracks",
     skipTracksDescription:
-      "Automatically skip tracks based on the selected status filters.",
-    skipStatusFilter: "Skip status filter",
+      "Automatically skip tracks based on the selected filters below.",
+    skipStatusFilter: "Skip filters",
     blocked: "Blocked",
     blockedDescription:
       "Skip blocked artists and tracks released by blocked distributors.",
     warning: "Warning",
-    warningDescription: "Skip artists marked as warning.",
+    warningDescription: "Skip artists with a warning trust label.",
     unknown: "Unknown",
-    unknownDescription: "Skip artists with unknown origin or status.",
+    unknownDescription:
+      "Skip artists whose country of origin is not confirmed. This does not affect artists that are not in Phonkersbase.",
 
     popup: "Popup",
     showSkipPopup: "Show skip popup",
     showSkipPopupDescription: "Show a notification when Basify skips a track.",
     popupDuration: "Popup duration",
     popupDurationDescription:
-      "How long each skip popup stays visible, in milliseconds.",
+      "How long each skip popup stays visible, in seconds.",
     visiblePopupLimit: "Visible popup limit",
     visiblePopupLimitDescription:
-      "Maximum number of skip popups visible at the same time.",
+      "Maximum number of skip popups visible at once.",
 
     flags: "Flags",
     useEmojiFlags: "Use emoji flags",
     useEmojiFlagsDescription:
-      "Use country emoji flags instead of flag images in now playing and artist profile.",
+      "Display country flags as emojis instead of flat rectangular icons.",
 
-    nowPlaying: "Now Playing",
+    nowPlaying: "Now Playing Bar",
     highlightNowPlayingBar: "Highlight now playing bar",
     highlightNowPlayingBarDescription:
-      "Color the now playing bar based on the strongest artist status on the current track.",
+      "Change the now playing bar background based on the current track's trust level, using all artists and the distributor.",
     formatArtistNames: "Format artist names",
     formatArtistNamesDescription:
-      "Color artist names in now playing when the artist exists in the Basify database.",
+      "Color artist names in the now playing bar based on their trust level.",
     showStatusShapes: "Show status shapes",
     showStatusShapesDescription:
-      "Show a small shape next to each artist name: blocked square, warning triangle, approved circle, etc.",
+      "Show a small status shape next to each artist name in the now playing bar: blocked square, warning triangle, approved circle, etc.",
     showArtistFlags: "Show artist flags",
     showArtistFlagsDescription:
-      "Show country flags next to artist names in now playing.",
+      "Show country flags next to artist names in the now playing bar.",
 
     storage: "Storage",
-    artistCacheLimit: "Artist cache limit",
-    artistCacheLimitDescription: "Maximum number of artists stored locally.",
+    artistCacheLimit: "Cached artists limit",
+    artistCacheLimitDescription:
+      "Maximum number of artists stored locally to reduce repeated API requests.",
 
     reset: "Reset",
     clearBasifyData: "Clear Basify data",
-    clearBasifyDataDescription: "This clears cached artists and settings.",
+    clearBasifyDataDescription: "Reset Basify settings to default.",
     resetButton: "Reset",
     settingsResetNotification: "Basify settings have been reset",
 
     poweredBy: "Powered by",
-    allInformationTakenFrom: "All information taken from database",
+    allInformationTakenFrom: "All information is taken from the database at:",
     createdBy: "Created by",
 
     trust: {
@@ -85,22 +87,23 @@ const BasifyLocales = {
     settingsTitle: "Налаштування Basify",
 
     language: "Мова",
-    locale: "Мова",
-    localeDescription: "Оберіть мову для налаштувань і повідомлень Basify.",
+    locale: "Мова інтерфейсу",
+    localeDescription: "Оберіть мову для налаштувань Basify і сповіщень.",
 
     skipping: "Пропуск треків",
     skipTracks: "Пропускати треки",
     skipTracksDescription:
-      "Автоматично пропускати треки за вибраними статусами.",
-    skipStatusFilter: "Фільтр статусів для пропуску",
+      "Автоматично пропускати треки за вибраними нижче фільтрами.",
+    skipStatusFilter: "Фільтри пропуску",
     blocked: "Заблоковані",
     blockedDescription:
-      "Пропускати заблокованих артистів і треки від заблокованих дистрибʼюторів.",
+      "Пропускати заблокованих артистів і треки, випущені заблокованими дистрибʼюторами.",
     warning: "Попередження",
-    warningDescription: "Пропускати артистів зі статусом попередження.",
+    warningDescription:
+      "Пропускати артистів із міткою довіри «Будь обережний».",
     unknown: "Невідомі",
     unknownDescription:
-      "Пропускати артистів із невідомим походженням або статусом.",
+      "Пропускати артистів, країна походження яких не підтверджена. Це не впливає на артистів, яких немає у Phonkersbase.",
 
     popup: "Сповіщення",
     showSkipPopup: "Показувати сповіщення про пропуск",
@@ -108,44 +111,44 @@ const BasifyLocales = {
       "Показувати сповіщення, коли Basify пропускає трек.",
     popupDuration: "Тривалість сповіщення",
     popupDurationDescription:
-      "Скільки мілісекунд сповіщення про пропуск залишається видимим.",
+      "Скільки секунд кожне сповіщення про пропуск залишається видимим.",
     visiblePopupLimit: "Ліміт видимих сповіщень",
     visiblePopupLimitDescription:
-      "Максимальна кількість сповіщень про пропуск одночасно.",
+      "Максимальна кількість сповіщень про пропуск, видимих одночасно.",
 
     flags: "Прапори",
-    useEmojiFlags: "Використовувати emoji-прапори",
+    useEmojiFlags: "Використовувати емодзі-прапори",
     useEmojiFlagsDescription:
-      "Використовувати emoji-прапори замість зображень прапорів у Now Playing та профілі артиста.",
+      "Показувати прапори країн як емодзі замість пласких прямокутних іконок.",
 
-    nowPlaying: "Now Playing",
-    highlightNowPlayingBar: "Підсвічувати Now Playing bar",
+    nowPlaying: "Панель поточного треку",
+    highlightNowPlayingBar: "Підсвічувати панель поточного треку",
     highlightNowPlayingBarDescription:
-      "Фарбувати Now Playing bar за найсильнішим статусом артиста в поточному треку.",
+      "Змінювати фон панелі поточного треку відповідно до рівня довіри треку, враховуючи всіх артистів і дистрибʼютора.",
     formatArtistNames: "Форматувати імена артистів",
     formatArtistNamesDescription:
-      "Фарбувати імена артистів у Now Playing, якщо артист є в базі Basify.",
-    showStatusShapes: "Показувати фігури статусу",
+      "Забарвлювати імена артистів на панелі поточного треку відповідно до їхнього рівня довіри.",
+    showStatusShapes: "Показувати позначки статусу",
     showStatusShapesDescription:
-      "Показувати маленьку фігуру біля імені артиста: квадрат для заблокованих, трикутник для попереджень, коло для дозволених тощо.",
+      "Показувати маленьку позначку статусу біля імені кожного артиста на панелі поточного треку: квадрат для заблокованих, трикутник для попереджень, коло для схвалених тощо.",
     showArtistFlags: "Показувати прапори артистів",
     showArtistFlagsDescription:
-      "Показувати прапори країн біля імен артистів у Now Playing.",
+      "Показувати прапори країн походження артистів біля їхніх імен на панелі поточного треку.",
 
     storage: "Сховище",
-    artistCacheLimit: "Ліміт кешу артистів",
+    artistCacheLimit: "Ліміт кешованих артистів",
     artistCacheLimitDescription:
-      "Максимальна кількість артистів у локальному кеші.",
+      "Максимальна кількість артистів, що зберігаються локально для зменшення повторних запитів.",
 
     reset: "Скидання",
     clearBasifyData: "Очистити дані Basify",
-    clearBasifyDataDescription: "Це очистить кеш артистів і налаштування.",
+    clearBasifyDataDescription: "Скинути налаштування Basify до стандартних.",
     resetButton: "Скинути",
     settingsResetNotification: "Налаштування Basify скинуто",
 
     poweredBy: "За підтримки",
-    allInformationTakenFrom: "Уся інформація взята з бази даних",
-    createdBy: "Створено",
+    allInformationTakenFrom: "Усю інформацію взято з бази даних:",
+    createdBy: "Створив",
 
     trust: {
       pride: "Наша гордість",
@@ -377,7 +380,7 @@ class LocalStorageManager {
         showNowPlayingArtistStatusShape: true,
         showNowPlayingArtistFlags: true,
 
-        artistCacheLimit: 150,
+        artistCacheLimit: 50,
       },
     };
   }
