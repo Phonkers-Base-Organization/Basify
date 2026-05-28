@@ -599,7 +599,7 @@ class Artist {
         return country;
       }
 
-      return new Country(country.name, country.emoji);
+      return new Country(country.name, country.emoji, country.countryCode);
     });
     this.labels = data.labels || [];
     this.updatedAt = data.updatedAt || Date.now();
