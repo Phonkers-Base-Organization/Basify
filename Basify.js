@@ -255,6 +255,10 @@ const BLOCKED_DISTRIBUTORS = [
 class BasifyI18n {
   static defaultLocale = "en";
   static lowercaseCountryNames = {
+    "gb-sct": {
+      en: "Scotland",
+      uk: "Шотландія",
+    },
     ru: {
       en: "russia",
       uk: "росія",
@@ -535,10 +539,12 @@ class LocalStorageManager {
 }
 
 class Country {
-  constructor(name, emoji) {
+  constructor(name, emoji, countryCode = null) {
     this.name = name;
     this.emoji = emoji;
-    this.countryCode = this.emojiToCountryCode(emoji);
+    this.countryCode = countryCode
+      ? countryCode
+      : this.emojiToCountryCode(emoji);
   }
 
   emojiToCountryCode(emoji) {
@@ -657,6 +663,15 @@ class Artist {
 
         if (countryName === "belarus") {
           return new Country("belarus", "🇧🇾");
+        }
+
+        if (countryName === "Scotland") {
+          console.log(countryName, countryEmoji);
+          return new Country(countryName, countryEmoji, "gb-sct");
+        }
+
+        if (countryName === "Syria") {
+          return new Country(countryName, countryEmoji, "sy");
         }
 
         return new Country(countryName, countryEmoji);
