@@ -75,13 +75,13 @@ Open Spotify and select **Marketplace** from the sidebar.
 
 Open the **Extensions** tab and search for **Basify**.
 
-![Search for Basify](assets/screenshots/en/marketplace-search-basify.png)
+![Search for Basify](assets/screenshots/marketplace-search-basify.png)
 
 ### 5. Install Basify
 
 Click **Install**. Restart Spotify if the extension does not appear immediately.
 
-![Install Basify from Marketplace](assets/screenshots/en/marketplace-install-basify.png)
+![Install Basify from Marketplace](assets/screenshots/marketplace-install-basify-en.png)
 
 If Basify does not appear in Marketplace yet, use the manual installation method below.
 

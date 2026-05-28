@@ -75,13 +75,13 @@ curl -fsSL https://raw.githubusercontent.com/spicetify/cli/main/install.sh | sh
 
 Відкрийте вкладку **Extensions** і знайдіть **Basify**.
 
-![Пошук Basify](screenshots/en/marketplace-search-basify.png)
+![Пошук Basify](screenshots/marketplace-search-basify.png)
 
 ### 5. Встановіть Basify
 
 Натисніть **Install**. Перезапустіть Spotify, якщо розширення не зʼявилося одразу.
 
-![Встановлення Basify з Маркетплейсу](screenshots/en/marketplace-install-basify.png)
+![Встановлення Basify з Маркетплейсу](screenshots/marketplace-install-basify-uk.png)
 
 Якщо Basify ще не зʼявився у Маркетплейсі, скористайтеся способом ручного встановлення нижче.
 
