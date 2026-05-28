@@ -22,7 +22,7 @@
     ]
   },
   {
-    "name": "Basify",
+    "name": "Basify UA",
     "description": "Розширення Spicetify для виявлення та пропуску ненадійних виконавців і дистрибʼюторів.",
     "preview": "assets/uk_animation.gif",
     "main": "Basify.js",
