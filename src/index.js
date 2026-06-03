@@ -224,5 +224,6 @@ function main() {
     setTimeout(init, 100);
     return;
   }
+
   main();
 })();

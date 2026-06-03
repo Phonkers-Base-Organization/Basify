@@ -17,7 +17,7 @@ export default defineConfig({
       name: "Basify",
       fileName: () => "Basify.js",
     },
-    outDir: "..",
+    outDir: ".",
     emptyOutDir: false,
     minify: false,
     rollupOptions: {
