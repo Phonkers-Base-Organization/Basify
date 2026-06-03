@@ -1,6 +1,9 @@
 import { BasifyI18n } from "../locales/index.js";
 
 export class LocalStorageManager {
+  // JSON.parse(Spicetify.LocalStorage.get("Basify:data"))
+  // Spicetify.LocalStorage.remove("Basify:data")
+
   static get storage() {
     return Spicetify.LocalStorage;
   }
@@ -26,14 +29,16 @@ export class LocalStorageManager {
         showNowPlayingArtistStatusShape: true,
         showNowPlayingArtistFlags: true,
         showPlaylistRating: true,
-        artistCacheLimit: 50
-      }
+        artistCacheLimit: 50,
+      },
     };
   }
 
   static loadData() {
     try {
-      const rawData = LocalStorageManager.storage.get(LocalStorageManager.rootKey);
+      const rawData = LocalStorageManager.storage.get(
+        LocalStorageManager.rootKey,
+      );
       if (!rawData) {
         return LocalStorageManager.createDefaultData();
       }
@@ -44,8 +49,8 @@ export class LocalStorageManager {
         ...parsedData,
         settings: {
           ...defaultData.settings,
-          ...(parsedData.settings || {})
-        }
+          ...(parsedData.settings || {}),
+        },
       };
     } catch (error) {
       console.error("Failed to load extension storage:", error);
@@ -55,7 +60,10 @@ export class LocalStorageManager {
 
   static saveData(data) {
     try {
-      LocalStorageManager.storage.set(LocalStorageManager.rootKey, JSON.stringify(data));
+      LocalStorageManager.storage.set(
+        LocalStorageManager.rootKey,
+        JSON.stringify(data),
+      );
     } catch (error) {
       console.error("Failed to save extension storage:", error);
     }
@@ -84,7 +92,7 @@ export class LocalStorageManager {
     const savedArtist = {
       ...artist,
       updatedAt: now,
-      lastUsedAt: now
+      lastUsedAt: now,
     };
     await LocalStorageManager.updateData((data) => {
       data.artistsById[artist.id] = savedArtist;
@@ -129,7 +137,7 @@ export class LocalStorageManager {
     await LocalStorageManager.updateData((data) => {
       data.settings = {
         ...data.settings,
-        ...newSettings
+        ...newSettings,
       };
       LocalStorageManager.trimArtistCache(data);
     });

@@ -3,7 +3,11 @@ import { LocalStorageManager } from "../services/storage.js";
 import { SkipToastRenderer } from "./SkipToast.js";
 import { NowPlayingRuntimeState } from "../state/runtimeState.js";
 import { NowPlayingThemeOverlayRenderer } from "./ThemeOverlay.js";
-import { refreshCurrentArtistPage, handleTrackSkipIfNeeded, renderNowPlayingTrack } from "../index.js";
+import {
+  refreshCurrentArtistPage,
+  handleTrackSkipIfNeeded,
+  renderNowPlayingTrack,
+} from "../index.js";
 import { settingsSvg, phonkersbaseLogoSvg } from "../constants/icons.js";
 import { PlaylistViewRenderer } from "./PlaylistView.js";
 
@@ -15,7 +19,7 @@ export class SettingsMenu {
 
   static icons = {
     settings: settingsSvg,
-    phonkersbaseLogoSvg: phonkersbaseLogoSvg
+    phonkersbaseLogoSvg: phonkersbaseLogoSvg,
   };
 
   static registerButton() {
@@ -26,7 +30,7 @@ export class SettingsMenu {
       SettingsMenu.icons.settings,
       SettingsMenu.open,
       false,
-      false
+      false,
     );
     SettingsMenu.applyTopbarButtonClass();
   }
@@ -62,7 +66,9 @@ export class SettingsMenu {
   static updateModalTitle(locale = BasifyI18n.getLocale()) {
     const title = BasifyI18n.t("settingsTitle", locale);
     requestAnimationFrame(() => {
-      const settingsRoot = document.querySelector(".basify-settings-react-root");
+      const settingsRoot = document.querySelector(
+        ".basify-settings-react-root",
+      );
       if (!settingsRoot) return;
       const modal =
         settingsRoot.closest('[role="dialog"]') ||
@@ -70,7 +76,7 @@ export class SettingsMenu {
         document.querySelector('[role="dialog"]');
       if (!modal) return;
       const titleElement = Array.from(
-        modal.querySelectorAll('h1, [class*="Title"], [class*="title"]')
+        modal.querySelectorAll('h1, [class*="Title"], [class*="title"]'),
       ).find((element) => !settingsRoot.contains(element));
       if (!titleElement) return;
       titleElement.textContent = title;
@@ -83,9 +89,9 @@ export class SettingsMenu {
     Spicetify.PopupModal.display({
       title: BasifyI18n.t("settingsTitle"),
       content: container,
-      isLarge: true
+      isLarge: true,
     });
-    
+
     const React = Spicetify.React;
     const ReactDOM = Spicetify.ReactDOM;
     ReactDOM.render(React.createElement(SettingsMenu.Component), container);
@@ -127,7 +133,7 @@ export class SettingsMenu {
     }
 
     if (Object.hasOwn(changedSettings, "skipEnabled")) {
-      document.querySelectorAll('div[role="row"]').forEach(row => {
+      document.querySelectorAll('div[role="row"]').forEach((row) => {
         row.removeAttribute("data-basify-processed");
       });
       PlaylistViewRenderer.scanRows();
@@ -148,29 +154,38 @@ export class SettingsMenu {
     if (!skipSettingsChanged || !track) return;
     handleTrackSkipIfNeeded(track);
   }
-  
+
   static Component() {
     const React = Spicetify.React;
-    const [settings, setSettings] = React.useState(() => LocalStorageManager.getSettings());
+    const [settings, setSettings] = React.useState(() =>
+      LocalStorageManager.getSettings(),
+    );
     const t = (key) => BasifyI18n.t(key, settings.locale);
 
     const saveSettings = async (newSettings) => {
       const updatedSettings = { ...settings, ...newSettings };
       setSettings(updatedSettings);
       await LocalStorageManager.updateSettings(newSettings);
-      SettingsMenu.applyRuntimeSettings(updatedSettings, newSettings).catch((error) => {
-        console.error("Basify failed to apply runtime settings:", error);
-      });
+      SettingsMenu.applyRuntimeSettings(updatedSettings, newSettings).catch(
+        (error) => {
+          console.error("Basify failed to apply runtime settings:", error);
+        },
+      );
     };
 
     const resetSettings = async () => {
       const defaultSettings = await LocalStorageManager.resetSettings();
       setSettings(defaultSettings);
-      SettingsMenu.applyRuntimeSettings(defaultSettings, defaultSettings).catch((error) => {
-        console.error("Basify failed to apply runtime settings after reset:", error);
-      });
+      SettingsMenu.applyRuntimeSettings(defaultSettings, defaultSettings).catch(
+        (error) => {
+          console.error(
+            "Basify failed to apply runtime settings after reset:",
+            error,
+          );
+        },
+      );
       Spicetify.showNotification(
-        BasifyI18n.t("settingsResetNotification", defaultSettings.locale)
+        BasifyI18n.t("settingsResetNotification", defaultSettings.locale),
       );
     };
 
@@ -179,8 +194,10 @@ export class SettingsMenu {
       settings.skipWarningArtists ||
       settings.skipUnknownArtists;
 
-    const skipMainSwitchEnabled = settings.skipEnabled && skipStatusSwitchesEnabled;
-    const skipSubSwitchesDisabled = !settings.skipEnabled && skipStatusSwitchesEnabled;
+    const skipMainSwitchEnabled =
+      settings.skipEnabled && skipStatusSwitchesEnabled;
+    const skipSubSwitchesDisabled =
+      !settings.skipEnabled && skipStatusSwitchesEnabled;
     const popupSubSettingsDisabled = !settings.popupEnabled;
 
     return React.createElement(
@@ -193,9 +210,9 @@ export class SettingsMenu {
         value: settings.locale,
         options: [
           { value: "en", label: "English" },
-          { value: "uk", label: "Українська" }
+          { value: "uk", label: "Українська" },
         ],
-        onChange: (value) => saveSettings({ locale: value })
+        onChange: (value) => saveSettings({ locale: value }),
       }),
       React.createElement(SettingsMenu.SectionTitle, { title: t("skipping") }),
       React.createElement(SettingsMenu.ToggleRow, {
@@ -203,36 +220,38 @@ export class SettingsMenu {
         description: t("skipTracksDescription"),
         value: skipMainSwitchEnabled,
         disabled: !skipStatusSwitchesEnabled,
-        onChange: (value) => saveSettings({ skipEnabled: value })
+        onChange: (value) => saveSettings({ skipEnabled: value }),
       }),
-      React.createElement(SettingsMenu.SubSectionTitle, { title: t("skipStatusFilter") }),
+      React.createElement(SettingsMenu.SubSectionTitle, {
+        title: t("skipStatusFilter"),
+      }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("blocked"),
         description: t("blockedDescription"),
         value: settings.skipBlockedArtists,
         disabled: skipSubSwitchesDisabled,
-        onChange: (value) => saveSettings({ skipBlockedArtists: value })
+        onChange: (value) => saveSettings({ skipBlockedArtists: value }),
       }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("warning"),
         description: t("warningDescription"),
         value: settings.skipWarningArtists,
         disabled: skipSubSwitchesDisabled,
-        onChange: (value) => saveSettings({ skipWarningArtists: value })
+        onChange: (value) => saveSettings({ skipWarningArtists: value }),
       }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("unknown"),
         description: t("unknownDescription"),
         value: settings.skipUnknownArtists,
         disabled: skipSubSwitchesDisabled,
-        onChange: (value) => saveSettings({ skipUnknownArtists: value })
+        onChange: (value) => saveSettings({ skipUnknownArtists: value }),
       }),
       React.createElement(SettingsMenu.SectionTitle, { title: t("popup") }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("showSkipPopup"),
         description: t("showSkipPopupDescription"),
         value: settings.popupEnabled,
-        onChange: (value) => saveSettings({ popupEnabled: value })
+        onChange: (value) => saveSettings({ popupEnabled: value }),
       }),
       React.createElement(SettingsMenu.NumberRow, {
         label: t("popupDuration"),
@@ -242,7 +261,7 @@ export class SettingsMenu {
         max: 60,
         step: 0.5,
         disabled: popupSubSettingsDisabled,
-        onChange: (value) => saveSettings({ popupDurationMs: value * 1000 })
+        onChange: (value) => saveSettings({ popupDurationMs: value * 1000 }),
       }),
       React.createElement(SettingsMenu.NumberRow, {
         label: t("visiblePopupLimit"),
@@ -251,46 +270,52 @@ export class SettingsMenu {
         min: 1,
         max: 10,
         disabled: popupSubSettingsDisabled,
-        onChange: (value) => saveSettings({ visibleToastLimit: value })
+        onChange: (value) => saveSettings({ visibleToastLimit: value }),
       }),
       React.createElement(SettingsMenu.SectionTitle, { title: t("flags") }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("useEmojiFlags"),
         description: t("useEmojiFlagsDescription"),
         value: settings.emojiFlags,
-        onChange: (value) => saveSettings({ emojiFlags: value })
+        onChange: (value) => saveSettings({ emojiFlags: value }),
       }),
-      React.createElement(SettingsMenu.SectionTitle, { title: t("nowPlaying") }),
+      React.createElement(SettingsMenu.SectionTitle, {
+        title: t("nowPlaying"),
+      }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("highlightNowPlayingBar"),
         description: t("highlightNowPlayingBarDescription"),
         value: settings.formatNowPlayingBar,
-        onChange: (value) => saveSettings({ formatNowPlayingBar: value })
+        onChange: (value) => saveSettings({ formatNowPlayingBar: value }),
       }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("formatArtistNames"),
         description: t("formatArtistNamesDescription"),
         value: settings.formatNowPlayingArtistName,
-        onChange: (value) => saveSettings({ formatNowPlayingArtistName: value })
+        onChange: (value) =>
+          saveSettings({ formatNowPlayingArtistName: value }),
       }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("showStatusShapes"),
         description: t("showStatusShapesDescription"),
         value: settings.showNowPlayingArtistStatusShape,
-        onChange: (value) => saveSettings({ showNowPlayingArtistStatusShape: value })
+        onChange: (value) =>
+          saveSettings({ showNowPlayingArtistStatusShape: value }),
       }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("showArtistFlags"),
         description: t("showArtistFlagsDescription"),
         value: settings.showNowPlayingArtistFlags,
-        onChange: (value) => saveSettings({ showNowPlayingArtistFlags: value })
+        onChange: (value) => saveSettings({ showNowPlayingArtistFlags: value }),
       }),
-      React.createElement(SettingsMenu.SectionTitle, { title: t("playlistRating") }),
+      React.createElement(SettingsMenu.SectionTitle, {
+        title: t("playlistRating"),
+      }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("showPlaylistRating"),
         description: t("showPlaylistRatingDescription"),
         value: settings.showPlaylistRating,
-        onChange: (value) => saveSettings({ showPlaylistRating: value })
+        onChange: (value) => saveSettings({ showPlaylistRating: value }),
       }),
       React.createElement(SettingsMenu.SectionTitle, { title: t("storage") }),
       React.createElement(SettingsMenu.NumberRow, {
@@ -299,25 +324,35 @@ export class SettingsMenu {
         value: settings.artistCacheLimit,
         min: 1,
         max: 1000,
-        onChange: (value) => saveSettings({ artistCacheLimit: value })
+        onChange: (value) => saveSettings({ artistCacheLimit: value }),
       }),
       React.createElement(SettingsMenu.SectionTitle, { title: t("reset") }),
       React.createElement(SettingsMenu.ButtonRow, {
         label: t("clearBasifyData"),
         description: t("clearBasifyDataDescription"),
         buttonText: t("resetButton"),
-        onClick: resetSettings
+        onClick: resetSettings,
       }),
-      React.createElement(SettingsMenu.InfoSection, { locale: settings.locale })
+      React.createElement(SettingsMenu.InfoSection, {
+        locale: settings.locale,
+      }),
     );
   }
 
   static SectionTitle({ title }) {
-    return Spicetify.React.createElement("h2", { className: "basify-settings-section-title" }, title);
+    return Spicetify.React.createElement(
+      "h2",
+      { className: "basify-settings-section-title" },
+      title,
+    );
   }
 
   static SubSectionTitle({ title }) {
-    return Spicetify.React.createElement("div", { className: "basify-settings-subsection-title" }, title);
+    return Spicetify.React.createElement(
+      "div",
+      { className: "basify-settings-subsection-title" },
+      title,
+    );
   }
 
   static ToggleRow({ label, description, value, disabled = false, onChange }) {
@@ -325,7 +360,10 @@ export class SettingsMenu {
     return Spicetify.React.createElement(
       "div",
       { className: `basify-settings-row${disabled ? " is-disabled" : ""}` },
-      Spicetify.React.createElement(SettingsMenu.RowText, { label, description }),
+      Spicetify.React.createElement(SettingsMenu.RowText, {
+        label,
+        description,
+      }),
       Spicetify.React.createElement(Toggle, {
         value,
         checked: value,
@@ -335,8 +373,8 @@ export class SettingsMenu {
         onSelected: () => {
           if (disabled) return;
           onChange(!value);
-        }
-      })
+        },
+      }),
     );
   }
 
@@ -344,26 +382,38 @@ export class SettingsMenu {
     return Spicetify.React.createElement(
       "div",
       { className: "basify-settings-row" },
-      Spicetify.React.createElement(SettingsMenu.RowText, { label, description }),
+      Spicetify.React.createElement(SettingsMenu.RowText, {
+        label,
+        description,
+      }),
       Spicetify.React.createElement(
         "select",
         {
           className: "basify-settings-select",
           value,
-          onChange: (event) => onChange(event.target.value)
+          onChange: (event) => onChange(event.target.value),
         },
         options.map((option) =>
           Spicetify.React.createElement(
             "option",
             { key: option.value, value: option.value },
-            option.label
-          )
-        )
-      )
+            option.label,
+          ),
+        ),
+      ),
     );
   }
 
-  static NumberRow({ label, description, value, min, max, step = 1, disabled = false, onChange }) {
+  static NumberRow({
+    label,
+    description,
+    value,
+    min,
+    max,
+    step = 1,
+    disabled = false,
+    onChange,
+  }) {
     const [inputValue, setInputValue] = Spicetify.React.useState(String(value));
     Spicetify.React.useEffect(() => {
       setInputValue(String(value));
@@ -384,7 +434,10 @@ export class SettingsMenu {
     return Spicetify.React.createElement(
       "div",
       { className: `basify-settings-row${disabled ? " is-disabled" : ""}` },
-      Spicetify.React.createElement(SettingsMenu.RowText, { label, description }),
+      Spicetify.React.createElement(SettingsMenu.RowText, {
+        label,
+        description,
+      }),
       Spicetify.React.createElement("input", {
         className: "basify-settings-number",
         type: "number",
@@ -407,8 +460,8 @@ export class SettingsMenu {
             setInputValue(String(value));
             event.currentTarget.blur();
           }
-        }
-      })
+        },
+      }),
     );
   }
 
@@ -416,16 +469,20 @@ export class SettingsMenu {
     return Spicetify.React.createElement(
       "div",
       { className: "basify-settings-row" },
-      Spicetify.React.createElement(SettingsMenu.RowText, { label, description }),
+      Spicetify.React.createElement(SettingsMenu.RowText, {
+        label,
+        description,
+      }),
       Spicetify.React.createElement(
         "button",
         {
-          className: "Button-sc-qlcn5g-0 Button-small-buttonSecondary-useBrowserDefaultFocusStyle basify-settings-button",
+          className:
+            "Button-sc-qlcn5g-0 Button-small-buttonSecondary-useBrowserDefaultFocusStyle basify-settings-button",
           type: "button",
-          onClick
+          onClick,
         },
-        buttonText
-      )
+        buttonText,
+      ),
     );
   }
 
@@ -433,10 +490,18 @@ export class SettingsMenu {
     return Spicetify.React.createElement(
       "div",
       { className: "basify-settings-text-wrapper" },
-      Spicetify.React.createElement("div", { className: "basify-settings-label" }, label),
+      Spicetify.React.createElement(
+        "div",
+        { className: "basify-settings-label" },
+        label,
+      ),
       description
-        ? Spicetify.React.createElement("div", { className: "basify-settings-description" }, description)
-        : null
+        ? Spicetify.React.createElement(
+            "div",
+            { className: "basify-settings-description" },
+            description,
+          )
+        : null,
     );
   }
 
@@ -454,12 +519,14 @@ export class SettingsMenu {
         Spicetify.React.createElement(
           "span",
           { className: "basify-settings-info-powered-label" },
-          BasifyI18n.t("poweredBy", locale)
+          BasifyI18n.t("poweredBy", locale),
         ),
         Spicetify.React.createElement("span", {
           className: "basify-settings-info-logo",
-          dangerouslySetInnerHTML: { __html: SettingsMenu.icons.phonkersbaseLogoSvg }
-        })
+          dangerouslySetInnerHTML: {
+            __html: SettingsMenu.icons.phonkersbaseLogoSvg,
+          },
+        }),
       ),
       Spicetify.React.createElement(
         "div",
@@ -468,8 +535,12 @@ export class SettingsMenu {
         " ",
         Spicetify.React.createElement(
           "a",
-          { href: phonkersbaseUrl, target: "_blank", rel: "noopener noreferrer" },
-          "phonkersbase.com"
+          {
+            href: phonkersbaseUrl,
+            target: "_blank",
+            rel: "noopener noreferrer",
+          },
+          "phonkersbase.com",
         ),
       ),
       Spicetify.React.createElement(
@@ -480,9 +551,9 @@ export class SettingsMenu {
         Spicetify.React.createElement(
           "a",
           { href: githubUrl, target: "_blank", rel: "noopener noreferrer" },
-          "github.com/I2oman"
+          "github.com/I2oman",
         ),
-      )
+      ),
     );
   }
 

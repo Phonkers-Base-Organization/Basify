@@ -3,7 +3,8 @@ import { Country } from "./Country.js";
 
 export class Artist {
   static baseArtistURL = "open.spotify.com/artist/";
-  static apiURL = "https://www.phonkersbase.com/api/artists?limit=50&offset=0&locale=en&search=";
+  static apiURL =
+    "https://www.phonkersbase.com/api/artists?limit=50&offset=0&locale=en&search=";
 
   constructor(data) {
     this.id = data.id;
@@ -26,18 +27,20 @@ export class Artist {
       if (!cachedArtistData.name && fallbackName) {
         cachedArtistData.name = fallbackName;
       }
-      const updatedArtistData = await LocalStorageManager.markArtistUsed(artistId);
+      const updatedArtistData =
+        await LocalStorageManager.markArtistUsed(artistId);
       return new Artist(updatedArtistData || cachedArtistData);
     }
     const fetchedArtistData = await Artist.fetch(artistId, fallbackName);
-    const savedArtistData = await LocalStorageManager.saveArtist(fetchedArtistData);
+    const savedArtistData =
+      await LocalStorageManager.saveArtist(fetchedArtistData);
     return new Artist(savedArtistData);
   }
 
   static async fetch(artistId, fallbackName = null) {
     const artistURL = Artist.baseArtistURL + artistId;
     const requestURL = Artist.apiURL + encodeURIComponent(artistURL);
-    
+
     try {
       const responseData = await Spicetify.CosmosAsync.get(requestURL);
       const artistItem = responseData?.data?.items?.[0];
@@ -50,7 +53,7 @@ export class Artist {
           countries: [],
           labels: [],
           description: null,
-          descriptionEn: null
+          descriptionEn: null,
         };
       }
 
@@ -66,14 +69,26 @@ export class Artist {
           const countryName = countryInfo.slice(1).join(" ");
           if (countryName === "ruzzia") return new Country("russia", "🇷🇺");
           if (countryName === "belarus") return new Country("belarus", "🇧🇾");
-          if (countryName === "Scotland") return new Country(countryName, countryEmoji, "gb-sct");
-          if (countryName === "Syria") return new Country(countryName, countryEmoji, "sy");
+          if (countryName === "Scotland")
+            return new Country(countryName, countryEmoji, "gb-sct");
+          if (countryName === "Syria")
+            return new Country(countryName, countryEmoji, "sy");
           return new Country(countryName, countryEmoji);
         }),
-        labels: (artistItem.listenLabels || []).map((labelData) => labelData.name)
+        labels: (artistItem.listenLabels || []).map(
+          (labelData) => labelData.name,
+        ),
       };
     } catch (e) {
-      return { id: artistId, name: fallbackName, url: artistURL, countries: [], labels: [], description: null, descriptionEn: null };
+      return {
+        id: artistId,
+        name: fallbackName,
+        url: artistURL,
+        countries: [],
+        labels: [],
+        description: null,
+        descriptionEn: null,
+      };
     }
   }
 }

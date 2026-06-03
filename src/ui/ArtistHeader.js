@@ -8,15 +8,20 @@ export class ArtistPageHeaderRenderer {
     artistHeaderElement.style.removeProperty("height");
     artistHeaderElement.classList.add("basify-artist-header-wrapper");
     ArtistPageHeaderRenderer.resetTitleStyles(artistHeaderElement);
-    const headerTextElement = artistHeaderElement.querySelector(".main-entityHeader-headerText");
+    const headerTextElement = artistHeaderElement.querySelector(
+      ".main-entityHeader-headerText",
+    );
     if (!headerTextElement) return;
     artistHeaderElement.querySelector(".basify-artist-info-section")?.remove();
-    const artistInfoSection = ArtistInfoSectionRenderer.createArtistInfoSection(artist);
+    const artistInfoSection =
+      ArtistInfoSectionRenderer.createArtistInfoSection(artist);
     headerTextElement.appendChild(artistInfoSection);
   }
 
   static resetTitleStyles(artistHeaderElement) {
-    const titleElements = artistHeaderElement.querySelectorAll(".main-entityHeader-title, .main-entityHeader-title *");
+    const titleElements = artistHeaderElement.querySelectorAll(
+      ".main-entityHeader-title, .main-entityHeader-title *",
+    );
     titleElements.forEach((element) => {
       element.style.removeProperty("font-size");
       element.style.removeProperty("line-height");
@@ -27,7 +32,8 @@ export class ArtistPageHeaderRenderer {
   }
 
   static injectStyles() {
-    if (document.getElementById(ArtistPageHeaderRenderer.styleElementId)) return;
+    if (document.getElementById(ArtistPageHeaderRenderer.styleElementId))
+      return;
     const style = document.createElement("style");
     style.id = ArtistPageHeaderRenderer.styleElementId;
     style.textContent = `

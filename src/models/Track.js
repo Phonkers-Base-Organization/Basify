@@ -28,7 +28,7 @@ export class BasifyTrack {
         uri: albumUri,
         locale: "",
         offset: 0,
-        limit: 50
+        limit: 50,
       });
       const album = response?.data?.albumUnion;
       const distributorTexts = [];
@@ -48,9 +48,11 @@ export class BasifyTrack {
 
   getBlockedDistributors() {
     return BLOCKED_DISTRIBUTORS.filter((blockedDistributor) => {
-      const normalizedBlockedDistributor = BasifyTrack.normalizeDistributorName(blockedDistributor);
+      const normalizedBlockedDistributor =
+        BasifyTrack.normalizeDistributorName(blockedDistributor);
       return this.distributors.some((distributorText) => {
-        const normalizedDistributorText = BasifyTrack.normalizeDistributorName(distributorText);
+        const normalizedDistributorText =
+          BasifyTrack.normalizeDistributorName(distributorText);
         return normalizedDistributorText.includes(normalizedBlockedDistributor);
       });
     });
@@ -73,7 +75,7 @@ export class BasifyTrack {
   getSkipReasons() {
     const settings = LocalStorageManager.getSettings();
     const reasons = [];
-    
+
     console.log(`[Basify] Analyzing track: ${this.name}`);
     console.log(`[Basify] Track distributors:`, this.distributors);
 
@@ -81,14 +83,18 @@ export class BasifyTrack {
     if (settings.skipBlockedArtists && blockedDistros.length > 0) {
       console.log(`[Basify] Found blocked distributor:`, blockedDistros);
       blockedDistros.forEach((distributor) => {
-        reasons.push({ type: "distributor", name: distributor, label: "blockedDistributor" });
+        reasons.push({
+          type: "distributor",
+          name: distributor,
+          label: "blockedDistributor",
+        });
       });
     }
 
     const skipLabelSettings = {
       blocked: settings.skipBlockedArtists,
       warning: settings.skipWarningArtists,
-      unknown: settings.skipUnknownArtists
+      unknown: settings.skipUnknownArtists,
     };
 
     console.log(`[Basify] Filter settings:`, skipLabelSettings);
@@ -98,7 +104,9 @@ export class BasifyTrack {
       console.log(`[Basify] Artist: ${artist.name}, Labels:`, labels);
       labels.forEach((label) => {
         if (skipLabelSettings[label]) {
-          console.log(`[Basify] Label "${label}" matches skip filter for ${artist.name}`);
+          console.log(
+            `[Basify] Label "${label}" matches skip filter for ${artist.name}`,
+          );
           reasons.push({ type: "artist", artist, label });
         }
       });
@@ -109,8 +117,17 @@ export class BasifyTrack {
 
   getTrackTheme() {
     if (this.isDistributorBlocked()) return "blocked";
-    const labels = this.artists.flatMap((artist) => this.getArtistLabels(artist));
-    const priority = ["blocked", "pride", "base", "approved", "unknown", "noInfo"];
+    const labels = this.artists.flatMap((artist) =>
+      this.getArtistLabels(artist),
+    );
+    const priority = [
+      "blocked",
+      "pride",
+      "base",
+      "approved",
+      "unknown",
+      "noInfo",
+    ];
     return priority.find((themeStatus) => labels.includes(themeStatus)) || null;
   }
 
@@ -169,20 +186,37 @@ export class BasifyTrack {
               dominantCount = count;
             }
           });
-          if (!dominantColor) { resolve(null); return; }
+          if (!dominantColor) {
+            resolve(null);
+            return;
+          }
           const [r, g, b] = dominantColor.split(",").map(Number);
           resolve(BasifyTrack.rgbToHex(r, g, b));
-        } catch (e) { resolve(null); }
+        } catch (e) {
+          resolve(null);
+        }
       };
       image.onerror = () => resolve(null);
     });
   }
 
   static rgbToHex(r, g, b) {
-    return `#${[r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("")}`;
+    return `#${[r, g, b]
+      .map((v) =>
+        Math.max(0, Math.min(255, Math.round(v)))
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")}`;
   }
 
   static normalizeDistributorName(v) {
-    return String(v).toLowerCase().replace(/[©℗]/gu, "").replace(/\b\d{4}\b/gu, "").replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/gu, " ").trim();
+    return String(v)
+      .toLowerCase()
+      .replace(/[©℗]/gu, "")
+      .replace(/\b\d{4}\b/gu, "")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .replace(/\s+/gu, " ")
+      .trim();
   }
 }

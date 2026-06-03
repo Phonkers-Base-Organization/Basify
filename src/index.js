@@ -11,13 +11,16 @@ import { SkipToastRenderer } from "./ui/SkipToast.js";
 import { LocalStorageManager } from "./services/storage.js";
 import { PlaylistViewRenderer } from "./ui/PlaylistView.js";
 
-export async function loadArtistPage(location = Spicetify.Platform.History.location) {
+export async function loadArtistPage(
+  location = Spicetify.Platform.History.location,
+) {
   const pathParts = location.pathname.split("/");
   if (pathParts[1] !== "artist" || !pathParts[2]) return;
   const artistId = pathParts[2];
   try {
     const artist = await Artist.create(artistId);
-    const artistHeaderElement = await DomObserver.waitForArtistPageHeaderElement(artistId, 5000);
+    const artistHeaderElement =
+      await DomObserver.waitForArtistPageHeaderElement(artistId, 5000);
     if (artistHeaderElement) {
       ArtistPageHeaderRenderer.apply(artistHeaderElement, artist);
     }
@@ -32,10 +35,12 @@ export async function refreshCurrentArtistPage() {
 
 export async function getTrackArtists(track) {
   const artistsData = track?.artists || [];
-  return Promise.all(artistsData.map((a) => {
-    const id = a.uri.split(":")[2];
-    return Artist.create(id, a.name);
-  }));
+  return Promise.all(
+    artistsData.map((a) => {
+      const id = a.uri.split(":")[2];
+      return Artist.create(id, a.name);
+    }),
+  );
 }
 
 export function fastSkipCheck() {
@@ -56,11 +61,13 @@ export function fastSkipCheck() {
     const cachedArtist = LocalStorageManager.getArtist(id);
     if (cachedArtist) {
       resolvedArtists.push(cachedArtist);
-      const labels = cachedArtist.labels.length ? cachedArtist.labels : ["noInfo"];
+      const labels = cachedArtist.labels.length
+        ? cachedArtist.labels
+        : ["noInfo"];
       const skipLabelSettings = {
         blocked: settings.skipBlockedArtists,
         warning: settings.skipWarningArtists,
-        unknown: settings.skipUnknownArtists
+        unknown: settings.skipUnknownArtists,
       };
 
       for (const label of labels) {
@@ -101,7 +108,7 @@ export async function handleNowPlayingTrackChange(timeoutMs = 10000) {
 export async function waitForCurrentSpotifyTrack(timeoutMs = 10000) {
   return await DomObserver.waitUntil(() => {
     const track = Spicetify.Player.data?.item;
-    return (track?.uri && track?.artists?.length) ? track : null;
+    return track?.uri && track?.artists?.length ? track : null;
   }, timeoutMs).catch(() => null);
 }
 
@@ -110,9 +117,12 @@ export async function buildNowPlayingTrackContext(spotifyTrack) {
     const [trackArtists, artistSpans, distributors] = await Promise.all([
       getTrackArtists(spotifyTrack),
       DomObserver.waitForNowPlayingArtist(spotifyTrack, 5000).catch(() => null),
-      BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => [])
+      BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []),
     ]);
-    return { basifyTrack: new BasifyTrack(spotifyTrack, trackArtists, distributors), artistSpans };
+    return {
+      basifyTrack: new BasifyTrack(spotifyTrack, trackArtists, distributors),
+      artistSpans,
+    };
   } catch (e) {
     return null;
   }
@@ -124,6 +134,7 @@ export function isStillCurrentTrack(trackUri) {
 
 export function handleCurrentTrackSkipCheck(reason = "Manual") {
   const track = NowPlayingRuntimeState.track;
+  console.log("track", track);
   if (track) {
     handleTrackSkipIfNeeded(track);
   } else {
@@ -155,7 +166,7 @@ async function startup() {
   PlaybackDeviceMonitor.start();
   PlaylistViewRenderer.start();
   loadArtistPage().catch(() => {});
-  
+
   const pathParts = Spicetify.Platform.History.location.pathname.split("/");
   if (pathParts[1] === "playlist" && pathParts[2]) {
     PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
@@ -176,7 +187,7 @@ function main() {
   });
   Spicetify.Platform.History.listen((location) => {
     loadArtistPage(location).catch(() => {});
-    
+
     const pathParts = location.pathname.split("/");
     if (pathParts[1] === "playlist" && pathParts[2]) {
       setTimeout(() => {
@@ -191,7 +202,25 @@ function main() {
 }
 
 (function init() {
-  if (!Spicetify?.Player || !Spicetify?.Platform?.ConnectAPI?.state || !Spicetify?.Locale) {
+  if (
+    !Spicetify?.Player ||
+    !Spicetify?.Platform ||
+    !Spicetify?.Platform?.History ||
+    !Spicetify?.Platform?.ConnectAPI ||
+    !Spicetify?.Platform?.ConnectAPI?.state ||
+    !Spicetify?.LocalStorage ||
+    !Spicetify?.CosmosAsync ||
+    !Spicetify?.Topbar ||
+    !Spicetify?.PopupModal ||
+    !Spicetify?.React ||
+    !Spicetify?.ReactDOM ||
+    !Spicetify?.ReactComponent ||
+    !Spicetify?.ReactComponent?.Toggle ||
+    !Spicetify?.GraphQL ||
+    !Spicetify?.GraphQL?.Definitions ||
+    !Spicetify?.GraphQL?.Definitions?.getAlbum ||
+    !Spicetify?.Locale
+  ) {
     setTimeout(init, 100);
     return;
   }

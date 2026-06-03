@@ -1,5 +1,9 @@
 export class DomObserver {
-  static async waitUntil(conditionCallback, timeoutMs = 5000, intervalMs = 100) {
+  static async waitUntil(
+    conditionCallback,
+    timeoutMs = 5000,
+    intervalMs = 100,
+  ) {
     const startTime = Date.now();
     return new Promise((resolve, reject) => {
       const intervalId = setInterval(() => {
@@ -23,27 +27,33 @@ export class DomObserver {
   }
 
   static async waitForElement(selector, timeoutMs = 5000) {
-    return DomObserver.waitUntil(() => document.querySelector(selector), timeoutMs);
+    return DomObserver.waitUntil(
+      () => document.querySelector(selector),
+      timeoutMs,
+    );
   }
 
   static async waitForNowPlayingArtist(track, timeoutMs = 5000) {
     return DomObserver.waitUntil(() => {
       const bottomBarArtistsContainer = document.querySelector(
-        "div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo"
+        "div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
       );
       const sideViewArtistsContainer = document.querySelector(
-        "div.Root__right-sidebar div.main-nowPlayingView-nowPlayingWidget div.main-trackInfo-artists span.OINH5zA0pQyzffwo"
+        "div.Root__right-sidebar div.main-nowPlayingView-nowPlayingWidget div.main-trackInfo-artists span.OINH5zA0pQyzffwo",
       );
 
       if (!bottomBarArtistsContainer) {
         return null;
       }
 
-      const trackArtistIds = (track?.artists || []).map((artist) => artist.uri.split(":")[2]);
-      const bottomBarArtistSpansById = DomObserver.extractArtistDataFromContainer(bottomBarArtistsContainer);
+      const trackArtistIds = (track?.artists || []).map(
+        (artist) => artist.uri.split(":")[2],
+      );
+      const bottomBarArtistSpansById =
+        DomObserver.extractArtistDataFromContainer(bottomBarArtistsContainer);
       const bottomBarMatchesTrackArtists = DomObserver.haveSameArtistIds(
         Object.keys(bottomBarArtistSpansById),
-        trackArtistIds
+        trackArtistIds,
       );
 
       if (!bottomBarMatchesTrackArtists) {
@@ -52,10 +62,12 @@ export class DomObserver {
 
       let sideViewArtistSpansById = {};
       if (sideViewArtistsContainer) {
-        sideViewArtistSpansById = DomObserver.extractArtistDataFromContainer(sideViewArtistsContainer);
+        sideViewArtistSpansById = DomObserver.extractArtistDataFromContainer(
+          sideViewArtistsContainer,
+        );
         const sideViewMatchesTrackArtists = DomObserver.haveSameArtistIds(
           Object.keys(sideViewArtistSpansById),
-          trackArtistIds
+          trackArtistIds,
         );
         if (!sideViewMatchesTrackArtists) {
           return null;
@@ -64,7 +76,7 @@ export class DomObserver {
 
       return {
         bottomBarArtistSpans: bottomBarArtistSpansById,
-        sideViewArtistSpans: sideViewArtistSpansById
+        sideViewArtistSpans: sideViewArtistSpansById,
       };
     }, timeoutMs);
   }
@@ -87,12 +99,16 @@ export class DomObserver {
     }
     const sortedFirstArtistIds = [...firstArtistIds].sort();
     const sortedSecondArtistIds = [...secondArtistIds].sort();
-    return sortedFirstArtistIds.every((artistId, index) => artistId === sortedSecondArtistIds[index]);
+    return sortedFirstArtistIds.every(
+      (artistId, index) => artistId === sortedSecondArtistIds[index],
+    );
   }
 
   static async waitForArtistPageHeaderElement(artistId, timeoutMs = 5000) {
     return DomObserver.waitUntil(() => {
-      const headerTitleElement = document.querySelector(".main-entityHeader-imageContainerWrapper");
+      const headerTitleElement = document.querySelector(
+        ".main-entityHeader-imageContainerWrapper",
+      );
       if (!headerTitleElement) return null;
       const currentPathname = Spicetify.Platform.History.location.pathname;
       const currentArtistId = currentPathname.split("/")[2];

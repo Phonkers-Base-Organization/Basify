@@ -27,7 +27,7 @@ export class PlaylistViewRenderer {
     if (mainView) {
       PlaylistViewRenderer.observer.observe(mainView, {
         childList: true,
-        subtree: true
+        subtree: true,
       });
       PlaylistViewRenderer.scanRows();
     }
@@ -37,32 +37,42 @@ export class PlaylistViewRenderer {
     if (PlaylistViewRenderer.eventsRegistered) return;
     PlaylistViewRenderer.eventsRegistered = true;
 
-    document.addEventListener("dblclick", (e) => {
-      const settings = LocalStorageManager.getSettings();
-      if (!settings.skipEnabled) return;
+    document.addEventListener(
+      "dblclick",
+      (e) => {
+        const settings = LocalStorageManager.getSettings();
+        if (!settings.skipEnabled) return;
 
-      const row = e.target.closest(".basify-blocked-row");
-      if (row) {
-        e.stopPropagation();
-        e.preventDefault();
-      }
-    }, true);
+        const row = e.target.closest(".basify-blocked-row");
+        if (row) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      },
+      true,
+    );
 
-    document.addEventListener("click", (e) => {
-      const settings = LocalStorageManager.getSettings();
-      if (!settings.skipEnabled) return;
+    document.addEventListener(
+      "click",
+      (e) => {
+        const settings = LocalStorageManager.getSettings();
+        if (!settings.skipEnabled) return;
 
-      const row = e.target.closest(".basify-blocked-row");
-      if (!row) return;
+        const row = e.target.closest(".basify-blocked-row");
+        if (!row) return;
 
-      const playButton = e.target.closest('button[aria-label*="Play"], button[aria-label*="play"]');
-      const indexCell = e.target.closest('.main-trackList-rowSectionIndex');
+        const playButton = e.target.closest(
+          'button[aria-label*="Play"], button[aria-label*="play"]',
+        );
+        const indexCell = e.target.closest(".main-trackList-rowSectionIndex");
 
-      if (playButton || indexCell) {
-        e.stopPropagation();
-        e.preventDefault();
-      }
-    }, true);
+        if (playButton || indexCell) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      },
+      true,
+    );
   }
 
   static async calculatePlaylistRating(playlistId) {
@@ -76,7 +86,10 @@ export class PlaylistViewRenderer {
       console.log(`[Basify] Requesting metadata for playlist: ${playlistId}`);
 
       while (hasMore) {
-        const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, { offset, limit }).catch(() => null);
+        const contents = await Spicetify.Platform.PlaylistAPI.getContents(
+          playlistUri,
+          { offset, limit },
+        ).catch(() => null);
         if (!contents || !contents.items || contents.items.length === 0) {
           hasMore = false;
           break;
@@ -91,30 +104,38 @@ export class PlaylistViewRenderer {
       }
 
       if (allTracks.length === 0) {
-        console.warn("[Basify] PlaylistAPI returned no tracks, trying fallback.");
+        console.warn(
+          "[Basify] PlaylistAPI returned no tracks, trying fallback.",
+        );
         return null;
       }
 
-      console.log(`[Basify] Loaded ${allTracks.length} tracks. Extracting artists...`);
+      console.log(
+        `[Basify] Loaded ${allTracks.length} tracks. Extracting artists...`,
+      );
 
       const uniqueArtistIds = new Set();
-      allTracks.forEach(item => {
+      allTracks.forEach((item) => {
         const trackData = item.track || item;
         if (!trackData) return;
-        
-        (trackData.artists || []).forEach(artist => {
+
+        (trackData.artists || []).forEach((artist) => {
           const id = artist.uri?.split?.(":")?.[2];
           if (id) uniqueArtistIds.add(id);
         });
       });
 
       const artistIdsArray = Array.from(uniqueArtistIds);
-      console.log(`[Basify] Found ${artistIdsArray.length} unique artists. Resolving...`);
+      console.log(
+        `[Basify] Found ${artistIdsArray.length} unique artists. Resolving...`,
+      );
 
-      const artists = await Promise.all(artistIdsArray.map(id => Artist.create(id)));
-      
+      const artists = await Promise.all(
+        artistIdsArray.map((id) => Artist.create(id)),
+      );
+
       const blockedArtistIds = new Set();
-      artists.forEach(artist => {
+      artists.forEach((artist) => {
         const labels = artist.labels || [];
         if (labels.includes("blocked")) {
           blockedArtistIds.add(artist.id);
@@ -122,11 +143,11 @@ export class PlaylistViewRenderer {
       });
 
       let blockedCount = 0;
-      allTracks.forEach(item => {
+      allTracks.forEach((item) => {
         const trackData = item.track || item;
         if (!trackData) return;
 
-        const hasBlockedArtist = (trackData.artists || []).some(artist => {
+        const hasBlockedArtist = (trackData.artists || []).some((artist) => {
           const id = artist.uri?.split?.(":")?.[2];
           return blockedArtistIds.has(id);
         });
@@ -135,13 +156,18 @@ export class PlaylistViewRenderer {
         }
       });
 
-      const percentage = allTracks.length > 0 ? Math.round((blockedCount / allTracks.length) * 100) : 0;
-      console.log(`[Basify] Safety Rating calculated: ${percentage}% (${blockedCount}/${allTracks.length})`);
+      const percentage =
+        allTracks.length > 0
+          ? Math.round((blockedCount / allTracks.length) * 100)
+          : 0;
+      console.log(
+        `[Basify] Safety Rating calculated: ${percentage}% (${blockedCount}/${allTracks.length})`,
+      );
 
       return {
         percentage,
         blockedCount,
-        totalCount: allTracks.length
+        totalCount: allTracks.length,
       };
     } catch (e) {
       console.error("[Basify] calculatePlaylistRating failed:", e);
@@ -162,7 +188,9 @@ export class PlaylistViewRenderer {
 
       const progress = elapsedTime / durationMs;
       const easeProgress = progress * (2 - progress);
-      const currentValue = Math.round(startValue + easeProgress * (targetValue - startValue));
+      const currentValue = Math.round(
+        startValue + easeProgress * (targetValue - startValue),
+      );
 
       element.textContent = `${currentValue}%`;
       requestAnimationFrame(update);
@@ -179,11 +207,17 @@ export class PlaylistViewRenderer {
         return;
       }
 
-      console.log(`[Basify] Attempting to render rating card for: ${playlistId}`);
-      const rating = await PlaylistViewRenderer.calculatePlaylistRating(playlistId);
+      console.log(
+        `[Basify] Attempting to render rating card for: ${playlistId}`,
+      );
+      const rating =
+        await PlaylistViewRenderer.calculatePlaylistRating(playlistId);
       if (!rating) return;
 
-      const header = await DomObserver.waitForElement(".main-entityHeader-headerText", 5000);
+      const header = await DomObserver.waitForElement(
+        ".main-entityHeader-headerText",
+        5000,
+      );
       if (!header) {
         console.warn("[Basify] Header text container not found.");
         return;
@@ -204,9 +238,10 @@ export class PlaylistViewRenderer {
 
       const locale = LocalStorageManager.getSettings().locale;
       const ratingText = locale === "uk" ? "Рейтинг безпеки" : "Safety Rating";
-      const subText = locale === "uk" 
-        ? `${rating.blockedCount} з ${rating.totalCount} треків заблоковано` 
-        : `${rating.blockedCount} of ${rating.totalCount} tracks blocked`;
+      const subText =
+        locale === "uk"
+          ? `${rating.blockedCount} з ${rating.totalCount} треків заблоковано`
+          : `${rating.blockedCount} of ${rating.totalCount} tracks blocked`;
 
       card.innerHTML = `
         <div class="basify-gauge-wrapper">
@@ -230,7 +265,11 @@ export class PlaylistViewRenderer {
 
         if (fillPath && percentageText) {
           fillPath.style.strokeDashoffset = String(dashOffset);
-          PlaylistViewRenderer.animateCounter(percentageText, rating.percentage, 800);
+          PlaylistViewRenderer.animateCounter(
+            percentageText,
+            rating.percentage,
+            800,
+          );
         }
       });
 
@@ -248,26 +287,38 @@ export class PlaylistViewRenderer {
       const artistLinks = row.querySelectorAll('a[href^="/artist/"]');
       if (!artistLinks.length) return;
 
-      const artistIds = Array.from(artistLinks).map(link => link.pathname.split("/")[2]);
+      const artistIds = Array.from(artistLinks).map(
+        (link) => link.pathname.split("/")[2],
+      );
       const artistIdsString = artistIds.join(",");
 
       if (row.dataset.basifyProcessed === artistIdsString) return;
       row.dataset.basifyProcessed = artistIdsString;
 
       row.classList.remove("basify-blocked-row");
-      row.querySelectorAll(".basify-playlist-status-icon-wrapper").forEach(el => {
-        el.removeEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
-        el.removeEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
-        el.remove();
-      });
-      
+      row
+        .querySelectorAll(".basify-playlist-status-icon-wrapper")
+        .forEach((el) => {
+          el.removeEventListener(
+            "mouseenter",
+            PlaylistViewRenderer.showTooltip,
+          );
+          el.removeEventListener(
+            "mouseleave",
+            PlaylistViewRenderer.hideTooltip,
+          );
+          el.remove();
+        });
+
       artistLinks.forEach((link) => {
         link.classList.remove("basify-now-playing-artist-name");
         link.style.removeProperty("--basify-artist-status-color");
       });
 
       try {
-        const artists = await Promise.all(artistIds.map(id => Artist.create(id)));
+        const artists = await Promise.all(
+          artistIds.map((id) => Artist.create(id)),
+        );
         let shouldSkipRow = false;
 
         artists.forEach((artist, index) => {
@@ -275,16 +326,33 @@ export class PlaylistViewRenderer {
           if (!link) return;
 
           const labels = artist.labels.length ? artist.labels : ["noInfo"];
-          const priority = ["blocked", "warning", "unknown", "pride", "base", "approved", "noInfo"];
-          const dominantLabel = priority.find(l => labels.includes(l)) || "noInfo";
-          const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
+          const priority = [
+            "blocked",
+            "warning",
+            "unknown",
+            "pride",
+            "base",
+            "approved",
+            "noInfo",
+          ];
+          const dominantLabel =
+            priority.find((l) => labels.includes(l)) || "noInfo";
+          const statusStyle =
+            NowPlayingArtistRenderer.statusStyles[dominantLabel];
 
           if (settings.formatNowPlayingArtistName && statusStyle?.color) {
             link.classList.add("basify-now-playing-artist-name");
-            link.style.setProperty("--basify-artist-status-color", statusStyle.color);
+            link.style.setProperty(
+              "--basify-artist-status-color",
+              statusStyle.color,
+            );
           }
 
-          if (dominantLabel === "blocked" || dominantLabel === "warning" || dominantLabel === "unknown") {
+          if (
+            dominantLabel === "blocked" ||
+            dominantLabel === "warning" ||
+            dominantLabel === "unknown"
+          ) {
             const wrapper = document.createElement("span");
             wrapper.className = "basify-playlist-status-icon-wrapper";
 
@@ -292,12 +360,15 @@ export class PlaylistViewRenderer {
             iconSpan.className = "basify-playlist-status-icon";
             iconSpan.style.color = statusStyle.color;
 
-            const badgeConfig = ArtistInfoSectionRenderer.badges[dominantLabel] || ArtistInfoSectionRenderer.badges.noInfo;
+            const badgeConfig =
+              ArtistInfoSectionRenderer.badges[dominantLabel] ||
+              ArtistInfoSectionRenderer.badges.noInfo;
             const labelText = BasifyI18n.t(badgeConfig.textKey);
-            
+
             const locale = LocalStorageManager.getSettings().locale;
-            const description = locale === "uk" ? artist.description : artist.descriptionEn;
-            
+            const description =
+              locale === "uk" ? artist.description : artist.descriptionEn;
+
             let tooltipText = `${labelText} (${artist.name})`;
             if (description) {
               tooltipText += ` - ${description}`;
@@ -320,8 +391,14 @@ export class PlaylistViewRenderer {
             }
 
             wrapper.appendChild(iconSpan);
-            wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
-            wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
+            wrapper.addEventListener(
+              "mouseenter",
+              PlaylistViewRenderer.showTooltip,
+            );
+            wrapper.addEventListener(
+              "mouseleave",
+              PlaylistViewRenderer.hideTooltip,
+            );
 
             link.parentNode.insertBefore(wrapper, link.nextSibling);
           }

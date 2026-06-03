@@ -1,6 +1,13 @@
 import { BasifyI18n } from "../locales/index.js";
 import { LocalStorageManager } from "../services/storage.js";
-import { crownSvg, thumbsUpSvg, starSvg, warningSvg, banSvg, unknownSvg } from "../constants/icons.js";
+import {
+  crownSvg,
+  thumbsUpSvg,
+  starSvg,
+  warningSvg,
+  banSvg,
+  unknownSvg,
+} from "../constants/icons.js";
 
 export class ArtistInfoSectionRenderer {
   static badges = {
@@ -11,7 +18,11 @@ export class ArtistInfoSectionRenderer {
     blocked: { textKey: "trust.blocked", icon: banSvg, bg: "#723433" },
     unknown: { textKey: "trust.unknown", icon: unknownSvg, bg: "#2f2f2f" },
     noInfo: { textKey: "trust.noInfo", icon: unknownSvg, bg: "#2f2f2f" },
-    blockedDistributor: { textKey: "trust.blockedDistributor", icon: banSvg, bg: "#723433" }
+    blockedDistributor: {
+      textKey: "trust.blockedDistributor",
+      icon: banSvg,
+      bg: "#723433",
+    },
   };
 
   static createArtistInfoSection(artist) {
@@ -32,7 +43,7 @@ export class ArtistInfoSectionRenderer {
       flexWrap: "nowrap",
       width: "100%",
       maxWidth: "100%",
-      overflow: "hidden"
+      overflow: "hidden",
     });
 
     [countriesRow, badgesRow].forEach((row) => {
@@ -40,33 +51,33 @@ export class ArtistInfoSectionRenderer {
         display: "flex",
         alignItems: "center",
         gap: "8px",
-        flexWrap: "wrap"
+        flexWrap: "wrap",
       });
     });
 
     if (artist.countries.length) {
       artist.countries.forEach((country) => {
         countriesRow.appendChild(
-          ArtistInfoSectionRenderer.createCountryBadge(country)
+          ArtistInfoSectionRenderer.createCountryBadge(country),
         );
       });
     } else {
       countriesRow.appendChild(
         ArtistInfoSectionRenderer.createSimpleTag(
-          BasifyI18n.t("unknownOrigin")
-        )
+          BasifyI18n.t("unknownOrigin"),
+        ),
       );
     }
 
     if (artist.labels.length) {
       artist.labels.forEach((label) => {
         badgesRow.appendChild(
-          ArtistInfoSectionRenderer.createTrustBadge(label, artist)
+          ArtistInfoSectionRenderer.createTrustBadge(label, artist),
         );
       });
     } else {
       badgesRow.appendChild(
-        ArtistInfoSectionRenderer.createTrustBadge("noInfo", artist)
+        ArtistInfoSectionRenderer.createTrustBadge("noInfo", artist),
       );
     }
 
@@ -89,7 +100,7 @@ export class ArtistInfoSectionRenderer {
       color: "#ffffff",
       fontSize: "1rem",
       lineHeight: "1",
-      whiteSpace: "nowrap"
+      whiteSpace: "nowrap",
     });
 
     const settings = LocalStorageManager.getSettings();
@@ -123,12 +134,13 @@ export class ArtistInfoSectionRenderer {
       fontSize: "1rem",
       lineHeight: "1",
       whiteSpace: "nowrap",
-      transition: "transform 0.1s ease"
+      transition: "transform 0.1s ease",
     });
 
     if (artist) {
       const locale = LocalStorageManager.getSettings().locale;
-      const description = locale === "uk" ? artist.description : artist.descriptionEn;
+      const description =
+        locale === "uk" ? artist.description : artist.descriptionEn;
       if (description) {
         badge.style.cursor = "pointer";
         badge.addEventListener("mouseenter", () => {
@@ -146,7 +158,7 @@ export class ArtistInfoSectionRenderer {
                 <div style="height: 1px; background: rgba(255,255,255,0.1); margin-bottom: 16px;"></div>
                 <p style="margin-bottom: 0; font-weight: 500; font-size: 15px; color: #b3b3b3;">${description}</p>
               </div>
-            `
+            `,
           });
         });
       }
@@ -167,7 +179,7 @@ export class ArtistInfoSectionRenderer {
       color: "#ffffff",
       fontSize: "1rem",
       lineHeight: "1",
-      whiteSpace: "nowrap"
+      whiteSpace: "nowrap",
     });
     return tag;
   }
@@ -179,7 +191,7 @@ export class ArtistInfoSectionRenderer {
       width: "1px",
       height: "100%",
       background: "rgba(255, 255, 255, 0.35)",
-      minHeight: "24px"
+      minHeight: "24px",
     });
     return separator;
   }

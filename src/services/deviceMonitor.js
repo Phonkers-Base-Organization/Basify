@@ -19,15 +19,24 @@ export class PlaybackDeviceMonitor {
 
   static check(reason = "Device check") {
     const device = PlaybackDeviceMonitor.getActiveDevice();
-    const playingOnCurrentDevice = PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice();
-    
-    if (playingOnCurrentDevice !== PlaybackDeviceMonitor.lastPlayingOnCurrentDevice) {
-      console.log(`[Basify] Device Status Changed: Playing locally = ${playingOnCurrentDevice} (${reason})`);
+    const playingOnCurrentDevice =
+      PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice();
+
+    if (
+      playingOnCurrentDevice !==
+      PlaybackDeviceMonitor.lastPlayingOnCurrentDevice
+    ) {
+      console.log(
+        `[Basify] Device Status Changed: Playing locally = ${playingOnCurrentDevice} (${reason})`,
+      );
     }
 
     PlaybackDeviceMonitor.lastPlayingOnCurrentDevice = playingOnCurrentDevice;
 
-    if (playingOnCurrentDevice && (reason === "Song changed" || reason === "Startup")) {
+    if (
+      playingOnCurrentDevice &&
+      (reason === "Song changed" || reason === "Startup")
+    ) {
       handleCurrentTrackSkipCheck(reason);
     }
   }

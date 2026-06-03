@@ -72,10 +72,14 @@ export class SkipToastRenderer {
       SkipToastRenderer.clearAll();
       return;
     }
-    const container = document.querySelector(`.${SkipToastRenderer.containerClassName}`);
+    const container = document.querySelector(
+      `.${SkipToastRenderer.containerClassName}`,
+    );
     if (!container) return;
     if (Object.hasOwn(changedSettings, "popupDurationMs")) {
-      const toasts = Array.from(container.querySelectorAll(".basify-skip-toast"));
+      const toasts = Array.from(
+        container.querySelectorAll(".basify-skip-toast"),
+      );
       toasts.forEach((toast) => {
         SkipToastRenderer.scheduleToastRemoval(toast);
       });
@@ -107,7 +111,9 @@ export class SkipToastRenderer {
   }
 
   static createContainer() {
-    let container = document.querySelector(`.${SkipToastRenderer.containerClassName}`);
+    let container = document.querySelector(
+      `.${SkipToastRenderer.containerClassName}`,
+    );
     if (container) return container;
     container = document.createElement("div");
     container.className = SkipToastRenderer.containerClassName;
@@ -150,12 +156,15 @@ export class SkipToastRenderer {
     skipReasons.forEach((reason) => {
       if (reason.type === "distributor") {
         artistsWrapper.appendChild(
-          SkipToastRenderer.createDistributorReasonRow(reason.name, reason.label)
+          SkipToastRenderer.createDistributorReasonRow(
+            reason.name,
+            reason.label,
+          ),
         );
         return;
       }
       artistsWrapper.appendChild(
-        SkipToastRenderer.createArtistReasonRow(reason.artist, [reason.label])
+        SkipToastRenderer.createArtistReasonRow(reason.artist, [reason.label]),
       );
     });
 
@@ -172,9 +181,12 @@ export class SkipToastRenderer {
     header.className = "basify-skip-toast-header";
     const title = document.createElement("div");
     title.className = "basify-skip-toast-title";
-    
+
     const locale = LocalStorageManager.getSettings().locale;
-    title.textContent = locale === "uk" ? `Пропущено ряд треків (${tracks.length})` : `Skipped multiple tracks (${tracks.length})`;
+    title.textContent =
+      locale === "uk"
+        ? `Пропущено ряд треків (${tracks.length})`
+        : `Skipped multiple tracks (${tracks.length})`;
 
     const closeButton = document.createElement("button");
     closeButton.className = "basify-skip-toast-close";
@@ -221,11 +233,16 @@ export class SkipToastRenderer {
       skipReasons.forEach((reason) => {
         if (reason.type === "distributor") {
           artistsWrapper.appendChild(
-            SkipToastRenderer.createDistributorReasonRow(reason.name, reason.label)
+            SkipToastRenderer.createDistributorReasonRow(
+              reason.name,
+              reason.label,
+            ),
           );
         } else {
           artistsWrapper.appendChild(
-            SkipToastRenderer.createArtistReasonRow(reason.artist, [reason.label])
+            SkipToastRenderer.createArtistReasonRow(reason.artist, [
+              reason.label,
+            ]),
           );
         }
       });
@@ -274,7 +291,8 @@ export class SkipToastRenderer {
     row.className = "basify-skip-toast-artist-row";
     const distributor = document.createElement("div");
     distributor.className = "basify-skip-toast-distributor-name";
-    distributor.textContent = distributorName || BasifyI18n.t("unknownDistributor");
+    distributor.textContent =
+      distributorName || BasifyI18n.t("unknownDistributor");
     const badgesWrapper = document.createElement("div");
     badgesWrapper.className = "basify-skip-toast-badges";
     const badge = ArtistInfoSectionRenderer.createTrustBadge(label);
@@ -324,7 +342,9 @@ export class SkipToastRenderer {
   }
 
   static clearAll() {
-    const container = document.querySelector(`.${SkipToastRenderer.containerClassName}`);
+    const container = document.querySelector(
+      `.${SkipToastRenderer.containerClassName}`,
+    );
     if (!container) return;
     container.querySelectorAll(".basify-skip-toast").forEach((toast) => {
       SkipToastRenderer.removeToast(toast, false);
