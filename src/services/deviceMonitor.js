@@ -13,30 +13,37 @@ export class PlaybackDeviceMonitor {
   static isSpotifyPlayingOnCurrentDevice() {
     const device = PlaybackDeviceMonitor.getActiveDevice();
     if (!device) return false;
-    const isLocal = device.isLocal || device.type.toLowerCase() === "computer";
-    return Boolean(isLocal);
+    return Boolean(device.isLocal && Spicetify.Player.isPlaying());
   }
 
   static check(reason = "Device check") {
     const device = PlaybackDeviceMonitor.getActiveDevice();
+    const deviceId = device?.id ?? null;
     const playingOnCurrentDevice =
       PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice();
 
-    if (
-      playingOnCurrentDevice !==
-      PlaybackDeviceMonitor.lastPlayingOnCurrentDevice
-    ) {
+    const deviceChanged = deviceId !== PlaybackDeviceMonitor.lastDeviceId;
+    const startedPlayingOnCurrentDevice =
+      playingOnCurrentDevice &&
+      PlaybackDeviceMonitor.lastPlayingOnCurrentDevice === false;
+
+    PlaybackDeviceMonitor.lastDeviceId = deviceId;
+    PlaybackDeviceMonitor.lastPlayingOnCurrentDevice = playingOnCurrentDevice;
+
+    if (deviceChanged) {
+      const deviceLabel = device
+        ? `${device.isLocal ? "local" : "remote"} ${device.type}: ${device.name}`
+        : "No active device";
+
+      console.log(`[Basify] ${reason}`);
+      console.log("[Basify] Active device:", deviceLabel);
       console.log(
-        `[Basify] Device Status Changed: Playing locally = ${playingOnCurrentDevice} (${reason})`,
+        "[Basify] Playing on current device:",
+        playingOnCurrentDevice,
       );
     }
 
-    PlaybackDeviceMonitor.lastPlayingOnCurrentDevice = playingOnCurrentDevice;
-
-    if (
-      playingOnCurrentDevice &&
-      (reason === "Song changed" || reason === "Startup")
-    ) {
+    if (startedPlayingOnCurrentDevice) {
       handleCurrentTrackSkipCheck(reason);
     }
   }

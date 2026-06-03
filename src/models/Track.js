@@ -75,13 +75,8 @@ export class BasifyTrack {
   getSkipReasons() {
     const settings = LocalStorageManager.getSettings();
     const reasons = [];
-
-    console.log(`[Basify] Analyzing track: ${this.name}`);
-    console.log(`[Basify] Track distributors:`, this.distributors);
-
     const blockedDistros = this.getBlockedDistributors();
     if (settings.skipBlockedArtists && blockedDistros.length > 0) {
-      console.log(`[Basify] Found blocked distributor:`, blockedDistros);
       blockedDistros.forEach((distributor) => {
         reasons.push({
           type: "distributor",
@@ -97,16 +92,10 @@ export class BasifyTrack {
       unknown: settings.skipUnknownArtists,
     };
 
-    console.log(`[Basify] Filter settings:`, skipLabelSettings);
-
     this.artists.forEach((artist) => {
       const labels = this.getArtistLabels(artist);
-      console.log(`[Basify] Artist: ${artist.name}, Labels:`, labels);
       labels.forEach((label) => {
         if (skipLabelSettings[label]) {
-          console.log(
-            `[Basify] Label "${label}" matches skip filter for ${artist.name}`,
-          );
           reasons.push({ type: "artist", artist, label });
         }
       });

@@ -137,26 +137,81 @@ export class ArtistInfoSectionRenderer {
       transition: "transform 0.1s ease",
     });
 
-    if (artist) {
+    if (artist && type !== "approved") {
       const locale = LocalStorageManager.getSettings().locale;
       const description =
         locale === "uk" ? artist.description : artist.descriptionEn;
+
       if (description) {
         badge.style.cursor = "pointer";
+
         badge.addEventListener("mouseenter", () => {
           badge.style.transform = "scale(1.04)";
         });
+
         badge.addEventListener("mouseleave", () => {
           badge.style.transform = "scale(1)";
         });
+
         badge.addEventListener("click", () => {
           Spicetify.PopupModal.display({
             title: artist.name,
             content: `
-              <div style="padding: 24px; font-size: 15px; line-height: 1.6; color: #ffffff; background: #121212; border-radius: 8px;">
-                <h3 style="margin-top: 0; color: #ff5252; font-size: 20px; font-weight: 700; margin-bottom: 14px;">${BasifyI18n.t(badgeData.textKey)}</h3>
-                <div style="height: 1px; background: rgba(255,255,255,0.1); margin-bottom: 16px;"></div>
-                <p style="margin-bottom: 0; font-weight: 500; font-size: 15px; color: #b3b3b3;">${description}</p>
+              <div style="
+                padding: 24px;
+                color: #ffffff;
+                background: linear-gradient(
+                  180deg,
+                  color-mix(in srgb, ${badgeData.bg} 28%, #121212) 0%,
+                  #121212 72%
+                );
+                border: 1px solid color-mix(in srgb, ${badgeData.bg} 55%, transparent);
+                border-radius: 18px;
+                box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+              ">
+                <div style="
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 8px;
+                  padding: 10px 15px;
+                  margin-bottom: 20px;
+                  border-radius: 999px;
+                  background: color-mix(in srgb, ${badgeData.bg} 25%, transparent);
+                  color: color-mix(in srgb, ${badgeData.bg} 50%, White);
+                  font-size: 17px;
+                  font-weight: 800;
+                  line-height: 1;
+                ">
+                  <span style="display: inline-flex; align-items: center;">
+                    ${BasifyI18n.t(badgeData.textKey)}
+                  </span>
+                  <span style="
+                    display: inline-flex;
+                    align-items: center;
+                    line-height: 1;
+                    transform: translateY(1px);
+                  ">
+                    ${badgeData.icon
+                      .replace(/margin-left:\s*6px;?/g, "")
+                      .replace(/width="20"/g, 'width="24"')
+                      .replace(/height="20"/g, 'height="24"')}
+                  </span>
+                </div>
+
+                <div style="
+                  height: 1px;
+                  margin-bottom: 18px;
+                  background: color-mix(in srgb, ${badgeData.bg} 45%, transparent);
+                "></div>
+
+                <p style="
+                  margin: 0;
+                  color: #d6d6d6;
+                  font-size: 15px;
+                  font-weight: 500;
+                  line-height: 1.65;
+                  white-space: pre-wrap;
+                ">${description.charAt(0).toUpperCase() + description.slice(1)}</p>
               </div>
             `,
           });
