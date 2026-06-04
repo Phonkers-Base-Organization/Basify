@@ -5,7 +5,7 @@ import { NowPlayingRuntimeState } from "../state/runtimeState.js";
 import { NowPlayingThemeOverlayRenderer } from "./ThemeOverlay.js";
 import {
   refreshCurrentArtistPage,
-  handleTrackSkipIfNeeded,
+  skipTrackIfNeeded,
   renderNowPlayingTrack,
 } from "../index.js";
 import { settingsSvg, phonkersbaseLogoSvg } from "../constants/icons.js";
@@ -152,7 +152,7 @@ export class SettingsMenu {
       Object.hasOwn(changedSettings, "skipUnknownArtists");
 
     if (!skipSettingsChanged || !track) return;
-    handleTrackSkipIfNeeded(track);
+    skipTrackIfNeeded(track);
   }
 
   static Component() {

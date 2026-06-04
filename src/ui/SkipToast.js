@@ -6,40 +6,15 @@ export class SkipToastRenderer {
   static styleElementId = "basify-skip-toast-style";
   static containerClassName = "basify-skip-toast-container";
   static toastTimeouts = new WeakMap();
-  static skippedTracksBuffer = [];
-  static flushTimeoutId = null;
 
-  static async bufferTrack(track) {
-    SkipToastRenderer.skippedTracksBuffer.push(track);
-    if (SkipToastRenderer.flushTimeoutId) {
-      clearTimeout(SkipToastRenderer.flushTimeoutId);
-    }
-    SkipToastRenderer.flushTimeoutId = setTimeout(() => {
-      SkipToastRenderer.flushBuffer();
-    }, 1200);
-  }
-
-  static async flushBuffer() {
-    const tracks = [...SkipToastRenderer.skippedTracksBuffer];
-    SkipToastRenderer.skippedTracksBuffer = [];
-    SkipToastRenderer.flushTimeoutId = null;
-    if (tracks.length === 0) return;
-
+  static async show(track) {
     const settings = LocalStorageManager.getSettings();
     if (!settings.popupEnabled) return;
 
     SkipToastRenderer.injectStyles();
-    const lastTrack = tracks[tracks.length - 1];
-    const dominantColor = await lastTrack.getDominantColor();
+    const dominantColor = await track.getDominantColor();
     const container = SkipToastRenderer.createContainer();
-
-    let toast;
-    if (tracks.length === 1) {
-      toast = SkipToastRenderer.createToast(lastTrack, dominantColor);
-    } else {
-      toast = SkipToastRenderer.createMultiToast(tracks, dominantColor);
-    }
-
+    const toast = SkipToastRenderer.createToast(track, dominantColor);
     toast.dataset.createdAt = String(Date.now());
     SkipToastRenderer.removeExtraToastsBeforeAppend(container);
     container.appendChild(toast);
@@ -169,89 +144,6 @@ export class SkipToastRenderer {
     });
 
     toast.append(header, trackName, artistsWrapper);
-    return toast;
-  }
-
-  static createMultiToast(tracks, dominantColor) {
-    const toast = document.createElement("div");
-    toast.className = "basify-skip-toast basify-multi-skip-toast";
-    SkipToastRenderer.applyDominantColorBackground(toast, dominantColor);
-
-    const header = document.createElement("div");
-    header.className = "basify-skip-toast-header";
-    const title = document.createElement("div");
-    title.className = "basify-skip-toast-title";
-
-    const locale = LocalStorageManager.getSettings().locale;
-    title.textContent =
-      locale === "uk"
-        ? `Пропущено ряд треків (${tracks.length})`
-        : `Skipped multiple tracks (${tracks.length})`;
-
-    const closeButton = document.createElement("button");
-    closeButton.className = "basify-skip-toast-close";
-    closeButton.type = "button";
-    closeButton.textContent = "×";
-    closeButton.addEventListener("click", () => {
-      SkipToastRenderer.removeToast(toast);
-    });
-    header.append(title, closeButton);
-
-    const listContainer = document.createElement("div");
-    listContainer.className = "basify-skip-toast-list-container";
-    listContainer.style.display = "flex";
-    listContainer.style.flexDirection = "column";
-    listContainer.style.gap = "10px";
-    listContainer.style.maxHeight = "240px";
-    listContainer.style.overflowY = "auto";
-    listContainer.style.paddingRight = "4px";
-
-    tracks.forEach((track) => {
-      const trackRow = document.createElement("div");
-      trackRow.className = "basify-skip-toast-multi-row";
-      trackRow.style.display = "flex";
-      trackRow.style.flexDirection = "column";
-      trackRow.style.gap = "4px";
-      trackRow.style.paddingBottom = "8px";
-      trackRow.style.borderBottom = "1px solid rgba(255, 255, 255, 0.08)";
-
-      const nameBtn = document.createElement("button");
-      nameBtn.className = "basify-skip-toast-track";
-      nameBtn.type = "button";
-      nameBtn.textContent = track.name;
-      nameBtn.style.fontSize = "14px";
-      if (track.id) {
-        nameBtn.addEventListener("click", (event) => {
-          event.stopPropagation();
-          Spicetify.Platform.History.push(`/track/${track.id}`);
-        });
-      }
-
-      const artistsWrapper = document.createElement("div");
-      artistsWrapper.className = "basify-skip-toast-artists";
-      const skipReasons = track.getSkipReasons();
-      skipReasons.forEach((reason) => {
-        if (reason.type === "distributor") {
-          artistsWrapper.appendChild(
-            SkipToastRenderer.createDistributorReasonRow(
-              reason.name,
-              reason.label,
-            ),
-          );
-        } else {
-          artistsWrapper.appendChild(
-            SkipToastRenderer.createArtistReasonRow(reason.artist, [
-              reason.label,
-            ]),
-          );
-        }
-      });
-
-      trackRow.append(nameBtn, artistsWrapper);
-      listContainer.appendChild(trackRow);
-    });
-
-    toast.append(header, listContainer);
     return toast;
   }
 

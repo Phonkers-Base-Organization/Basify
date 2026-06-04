@@ -33,7 +33,7 @@ export class DomObserver {
     );
   }
 
-  static async waitForNowPlayingArtist(track, timeoutMs = 5000) {
+  static async waitForNowPlayingArtistSpans(track, timeoutMs = 5000) {
     return DomObserver.waitUntil(() => {
       const bottomBarArtistsContainer = document.querySelector(
         "div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo",

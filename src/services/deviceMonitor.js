@@ -1,4 +1,4 @@
-import { handleCurrentTrackSkipCheck } from "../index.js";
+import { playPauseHandler } from "../index.js";
 
 export class PlaybackDeviceMonitor {
   static checkIntervalMs = 2000;
@@ -44,7 +44,7 @@ export class PlaybackDeviceMonitor {
     }
 
     if (startedPlayingOnCurrentDevice) {
-      handleCurrentTrackSkipCheck(reason);
+      playPauseHandler(reason);
     }
   }
 

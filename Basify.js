@@ -562,28 +562,12 @@ var Basify = (function(exports) {
 		static styleElementId = "basify-skip-toast-style";
 		static containerClassName = "basify-skip-toast-container";
 		static toastTimeouts = /* @__PURE__ */ new WeakMap();
-		static skippedTracksBuffer = [];
-		static flushTimeoutId = null;
-		static async bufferTrack(track) {
-			SkipToastRenderer.skippedTracksBuffer.push(track);
-			if (SkipToastRenderer.flushTimeoutId) clearTimeout(SkipToastRenderer.flushTimeoutId);
-			SkipToastRenderer.flushTimeoutId = setTimeout(() => {
-				SkipToastRenderer.flushBuffer();
-			}, 1200);
-		}
-		static async flushBuffer() {
-			const tracks = [...SkipToastRenderer.skippedTracksBuffer];
-			SkipToastRenderer.skippedTracksBuffer = [];
-			SkipToastRenderer.flushTimeoutId = null;
-			if (tracks.length === 0) return;
+		static async show(track) {
 			if (!LocalStorageManager.getSettings().popupEnabled) return;
 			SkipToastRenderer.injectStyles();
-			const lastTrack = tracks[tracks.length - 1];
-			const dominantColor = await lastTrack.getDominantColor();
+			const dominantColor = await track.getDominantColor();
 			const container = SkipToastRenderer.createContainer();
-			let toast;
-			if (tracks.length === 1) toast = SkipToastRenderer.createToast(lastTrack, dominantColor);
-			else toast = SkipToastRenderer.createMultiToast(tracks, dominantColor);
+			const toast = SkipToastRenderer.createToast(track, dominantColor);
 			toast.dataset.createdAt = String(Date.now());
 			SkipToastRenderer.removeExtraToastsBeforeAppend(container);
 			container.appendChild(toast);
@@ -679,60 +663,6 @@ var Basify = (function(exports) {
 				artistsWrapper.appendChild(SkipToastRenderer.createArtistReasonRow(reason.artist, [reason.label]));
 			});
 			toast.append(header, trackName, artistsWrapper);
-			return toast;
-		}
-		static createMultiToast(tracks, dominantColor) {
-			const toast = document.createElement("div");
-			toast.className = "basify-skip-toast basify-multi-skip-toast";
-			SkipToastRenderer.applyDominantColorBackground(toast, dominantColor);
-			const header = document.createElement("div");
-			header.className = "basify-skip-toast-header";
-			const title = document.createElement("div");
-			title.className = "basify-skip-toast-title";
-			title.textContent = LocalStorageManager.getSettings().locale === "uk" ? `Пропущено ряд треків (${tracks.length})` : `Skipped multiple tracks (${tracks.length})`;
-			const closeButton = document.createElement("button");
-			closeButton.className = "basify-skip-toast-close";
-			closeButton.type = "button";
-			closeButton.textContent = "×";
-			closeButton.addEventListener("click", () => {
-				SkipToastRenderer.removeToast(toast);
-			});
-			header.append(title, closeButton);
-			const listContainer = document.createElement("div");
-			listContainer.className = "basify-skip-toast-list-container";
-			listContainer.style.display = "flex";
-			listContainer.style.flexDirection = "column";
-			listContainer.style.gap = "10px";
-			listContainer.style.maxHeight = "240px";
-			listContainer.style.overflowY = "auto";
-			listContainer.style.paddingRight = "4px";
-			tracks.forEach((track) => {
-				const trackRow = document.createElement("div");
-				trackRow.className = "basify-skip-toast-multi-row";
-				trackRow.style.display = "flex";
-				trackRow.style.flexDirection = "column";
-				trackRow.style.gap = "4px";
-				trackRow.style.paddingBottom = "8px";
-				trackRow.style.borderBottom = "1px solid rgba(255, 255, 255, 0.08)";
-				const nameBtn = document.createElement("button");
-				nameBtn.className = "basify-skip-toast-track";
-				nameBtn.type = "button";
-				nameBtn.textContent = track.name;
-				nameBtn.style.fontSize = "14px";
-				if (track.id) nameBtn.addEventListener("click", (event) => {
-					event.stopPropagation();
-					Spicetify.Platform.History.push(`/track/${track.id}`);
-				});
-				const artistsWrapper = document.createElement("div");
-				artistsWrapper.className = "basify-skip-toast-artists";
-				track.getSkipReasons().forEach((reason) => {
-					if (reason.type === "distributor") artistsWrapper.appendChild(SkipToastRenderer.createDistributorReasonRow(reason.name, reason.label));
-					else artistsWrapper.appendChild(SkipToastRenderer.createArtistReasonRow(reason.artist, [reason.label]));
-				});
-				trackRow.append(nameBtn, artistsWrapper);
-				listContainer.appendChild(trackRow);
-			});
-			toast.append(header, listContainer);
 			return toast;
 		}
 		static applyDominantColorBackground(toast, dominantColor) {
@@ -1155,7 +1085,7 @@ var Basify = (function(exports) {
 		static async waitForElement(selector, timeoutMs = 5e3) {
 			return DomObserver.waitUntil(() => document.querySelector(selector), timeoutMs);
 		}
-		static async waitForNowPlayingArtist(track, timeoutMs = 5e3) {
+		static async waitForNowPlayingArtistSpans(track, timeoutMs = 5e3) {
 			return DomObserver.waitUntil(() => {
 				const bottomBarArtistsContainer = document.querySelector("div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo");
 				const sideViewArtistsContainer = document.querySelector("div.Root__right-sidebar div.main-nowPlayingView-nowPlayingWidget div.main-trackInfo-artists span.OINH5zA0pQyzffwo");
@@ -1664,7 +1594,7 @@ var Basify = (function(exports) {
 				console.warn("Basify failed to refresh artist page:", error);
 			});
 			if (!(Object.hasOwn(changedSettings, "skipEnabled") || Object.hasOwn(changedSettings, "skipBlockedArtists") || Object.hasOwn(changedSettings, "skipWarningArtists") || Object.hasOwn(changedSettings, "skipUnknownArtists")) || !track) return;
-			handleTrackSkipIfNeeded(track);
+			skipTrackIfNeeded(track);
 		}
 		static Component() {
 			const React = Spicetify.React;
@@ -1964,7 +1894,7 @@ var Basify = (function(exports) {
 				console.log("[Basify] Active device:", deviceLabel);
 				console.log("[Basify] Playing on current device:", playingOnCurrentDevice);
 			}
-			if (startedPlayingOnCurrentDevice) handleCurrentTrackSkipCheck(reason);
+			if (startedPlayingOnCurrentDevice) playPauseHandler(reason);
 		}
 		static start() {
 			if (PlaybackDeviceMonitor.intervalId) return;
@@ -2056,7 +1986,8 @@ var Basify = (function(exports) {
 		"PLAYA POSSE",
 		"VELVET MUSIC",
 		"GAMMA MUSIC",
-		"PEPERFUNK RECORDINGS"
+		"PEPERFUNK RECORDINGS",
+		"РНБ КЛУБ"
 	];
 	//#endregion
 	//#region src/models/Track.js
@@ -2270,9 +2201,11 @@ var Basify = (function(exports) {
 		const pathParts = location.pathname.split("/");
 		if (pathParts[1] !== "artist" || !pathParts[2]) return;
 		const artistId = pathParts[2];
+		const targetPathname = location.pathname;
 		try {
 			const artist = await Artist.create(artistId);
 			const artistHeaderElement = await DomObserver.waitForArtistPageHeaderElement(artistId, 5e3);
+			if (Spicetify.Platform.History.location.pathname !== targetPathname) return;
 			if (artistHeaderElement) ArtistPageHeaderRenderer.apply(artistHeaderElement, artist);
 		} catch (error) {}
 	}
@@ -2288,42 +2221,7 @@ var Basify = (function(exports) {
 			return Artist.create(id, a.name);
 		}));
 	}
-	function fastSkipCheck() {
-		const track = Spicetify.Player.data?.item;
-		if (!track?.uri || !track?.artists?.length) return false;
-		const settings = LocalStorageManager.getSettings();
-		if (!settings.skipEnabled) return false;
-		if (!PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice()) return false;
-		const artistIds = track.artists.map((a) => a.uri.split(":")[2]);
-		let shouldSkip = false;
-		const resolvedArtists = [];
-		for (const id of artistIds) {
-			const cachedArtist = LocalStorageManager.getArtist(id);
-			if (cachedArtist) {
-				resolvedArtists.push(cachedArtist);
-				const labels = cachedArtist.labels.length ? cachedArtist.labels : ["noInfo"];
-				const skipLabelSettings = {
-					blocked: settings.skipBlockedArtists,
-					warning: settings.skipWarningArtists,
-					unknown: settings.skipUnknownArtists
-				};
-				for (const label of labels) if (skipLabelSettings[label]) {
-					shouldSkip = true;
-					break;
-				}
-			}
-			if (shouldSkip) break;
-		}
-		if (shouldSkip) {
-			console.log(`[Basify] Fast Skip Pipeline triggered for: ${track.name}`);
-			const mockTrack = new BasifyTrack(track, resolvedArtists, []);
-			SkipToastRenderer.bufferTrack(mockTrack);
-			Spicetify.Player.next();
-			return true;
-		}
-		return false;
-	}
-	async function handleNowPlayingTrackChange(timeoutMs = 1e4) {
+	async function songChangeHandler(timeoutMs = 7500) {
 		NowPlayingThemeOverlayRenderer.clear();
 		try {
 			const spotifyTrack = await waitForCurrentSpotifyTrack(timeoutMs);
@@ -2332,7 +2230,7 @@ var Basify = (function(exports) {
 			if (!context || !isStillCurrentTrack(spotifyTrack.uri)) return;
 			const { basifyTrack, artistSpans } = context;
 			NowPlayingRuntimeState.update(basifyTrack, artistSpans);
-			if (handleTrackSkipIfNeeded(basifyTrack)) return;
+			if (skipTrackIfNeeded(basifyTrack)) return;
 			renderNowPlayingTrack(basifyTrack, artistSpans);
 		} catch (error) {}
 	}
@@ -2346,7 +2244,7 @@ var Basify = (function(exports) {
 		try {
 			const [trackArtists, artistSpans, distributors] = await Promise.all([
 				getTrackArtists(spotifyTrack),
-				DomObserver.waitForNowPlayingArtist(spotifyTrack, 5e3).catch(() => null),
+				DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5e3).catch(() => null),
 				BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => [])
 			]);
 			return {
@@ -2360,25 +2258,20 @@ var Basify = (function(exports) {
 	function isStillCurrentTrack(trackUri) {
 		return Spicetify.Player.data?.item?.uri === trackUri;
 	}
-	function handleCurrentTrackSkipCheck(reason = "Manual") {
+	function playPauseHandler(reason = "Manual") {
 		const track = NowPlayingRuntimeState.track;
-		console.log("track", track);
-		if (track) handleTrackSkipIfNeeded(track);
-		else {
-			if (fastSkipCheck()) return;
-			handleNowPlayingTrackChange().catch(() => {});
+		if (track) {
+			skipTrackIfNeeded(track);
+			return;
 		}
+		songChangeHandler().catch(() => {});
 	}
-	function handleTrackSkipIfNeeded(basifyTrack) {
-		const isLocal = PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice();
-		const settings = LocalStorageManager.getSettings();
-		if (!isLocal || !settings.skipEnabled) return false;
-		if (basifyTrack.getSkipReasons().length > 0) {
-			SkipToastRenderer.bufferTrack(basifyTrack);
-			Spicetify.Player.next();
-			return true;
-		}
-		return false;
+	function skipTrackIfNeeded(basifyTrack) {
+		if (!PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice()) return false;
+		if (!basifyTrack.shouldSkipTrack()) return false;
+		SkipToastRenderer.show(basifyTrack);
+		Spicetify.Player.next();
+		return true;
 	}
 	function renderNowPlayingTrack(basifyTrack, artistSpans) {
 		NowPlayingThemeOverlayRenderer.applyFromTrack(basifyTrack);
@@ -2391,17 +2284,15 @@ var Basify = (function(exports) {
 		loadArtistPage().catch(() => {});
 		const pathParts = Spicetify.Platform.History.location.pathname.split("/");
 		if (pathParts[1] === "playlist" && pathParts[2]) PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
-		if (fastSkipCheck()) return;
-		handleNowPlayingTrackChange().catch(() => {});
+		songChangeHandler().catch(() => {});
 	}
 	function main() {
 		startup().catch(() => {});
 		Spicetify.Player.addEventListener("songchange", () => {
-			if (fastSkipCheck()) return;
-			handleNowPlayingTrackChange().catch(() => {});
+			songChangeHandler().catch(() => {});
 		});
 		Spicetify.Player.addEventListener("onplaypause", () => {
-			handleCurrentTrackSkipCheck("Play/Pause");
+			playPauseHandler("Play/Pause");
 		});
 		Spicetify.Platform.History.listen((location) => {
 			loadArtistPage(location).catch(() => {});
@@ -2423,15 +2314,14 @@ var Basify = (function(exports) {
 	})();
 	//#endregion
 	exports.buildNowPlayingTrackContext = buildNowPlayingTrackContext;
-	exports.fastSkipCheck = fastSkipCheck;
 	exports.getTrackArtists = getTrackArtists;
-	exports.handleCurrentTrackSkipCheck = handleCurrentTrackSkipCheck;
-	exports.handleNowPlayingTrackChange = handleNowPlayingTrackChange;
-	exports.handleTrackSkipIfNeeded = handleTrackSkipIfNeeded;
 	exports.isStillCurrentTrack = isStillCurrentTrack;
 	exports.loadArtistPage = loadArtistPage;
+	exports.playPauseHandler = playPauseHandler;
 	exports.refreshCurrentArtistPage = refreshCurrentArtistPage;
 	exports.renderNowPlayingTrack = renderNowPlayingTrack;
+	exports.skipTrackIfNeeded = skipTrackIfNeeded;
+	exports.songChangeHandler = songChangeHandler;
 	exports.waitForCurrentSpotifyTrack = waitForCurrentSpotifyTrack;
 	return exports;
 })({});

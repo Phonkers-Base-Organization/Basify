@@ -17,10 +17,14 @@ export async function loadArtistPage(
   const pathParts = location.pathname.split("/");
   if (pathParts[1] !== "artist" || !pathParts[2]) return;
   const artistId = pathParts[2];
+  const targetPathname = location.pathname;
   try {
     const artist = await Artist.create(artistId);
     const artistHeaderElement =
       await DomObserver.waitForArtistPageHeaderElement(artistId, 5000);
+    if (Spicetify.Platform.History.location.pathname !== targetPathname) {
+      return;
+    }
     if (artistHeaderElement) {
       ArtistPageHeaderRenderer.apply(artistHeaderElement, artist);
     }
@@ -43,55 +47,7 @@ export async function getTrackArtists(track) {
   );
 }
 
-export function fastSkipCheck() {
-  const track = Spicetify.Player.data?.item;
-  if (!track?.uri || !track?.artists?.length) return false;
-
-  const settings = LocalStorageManager.getSettings();
-  if (!settings.skipEnabled) return false;
-
-  const isLocal = PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice();
-  if (!isLocal) return false;
-
-  const artistIds = track.artists.map((a) => a.uri.split(":")[2]);
-  let shouldSkip = false;
-
-  const resolvedArtists = [];
-  for (const id of artistIds) {
-    const cachedArtist = LocalStorageManager.getArtist(id);
-    if (cachedArtist) {
-      resolvedArtists.push(cachedArtist);
-      const labels = cachedArtist.labels.length
-        ? cachedArtist.labels
-        : ["noInfo"];
-      const skipLabelSettings = {
-        blocked: settings.skipBlockedArtists,
-        warning: settings.skipWarningArtists,
-        unknown: settings.skipUnknownArtists,
-      };
-
-      for (const label of labels) {
-        if (skipLabelSettings[label]) {
-          shouldSkip = true;
-          break;
-        }
-      }
-    }
-    if (shouldSkip) break;
-  }
-
-  if (shouldSkip) {
-    console.log(`[Basify] Fast Skip Pipeline triggered for: ${track.name}`);
-    const mockTrack = new BasifyTrack(track, resolvedArtists, []);
-    SkipToastRenderer.bufferTrack(mockTrack);
-    Spicetify.Player.next();
-    return true;
-  }
-
-  return false;
-}
-
-export async function handleNowPlayingTrackChange(timeoutMs = 10000) {
+export async function songChangeHandler(timeoutMs = 7500) {
   NowPlayingThemeOverlayRenderer.clear();
   try {
     const spotifyTrack = await waitForCurrentSpotifyTrack(timeoutMs);
@@ -100,7 +56,7 @@ export async function handleNowPlayingTrackChange(timeoutMs = 10000) {
     if (!context || !isStillCurrentTrack(spotifyTrack.uri)) return;
     const { basifyTrack, artistSpans } = context;
     NowPlayingRuntimeState.update(basifyTrack, artistSpans);
-    if (handleTrackSkipIfNeeded(basifyTrack)) return;
+    if (skipTrackIfNeeded(basifyTrack)) return;
     renderNowPlayingTrack(basifyTrack, artistSpans);
   } catch (error) {}
 }
@@ -116,7 +72,9 @@ export async function buildNowPlayingTrackContext(spotifyTrack) {
   try {
     const [trackArtists, artistSpans, distributors] = await Promise.all([
       getTrackArtists(spotifyTrack),
-      DomObserver.waitForNowPlayingArtist(spotifyTrack, 5000).catch(() => null),
+      DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5000).catch(
+        () => null,
+      ),
       BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []),
     ]);
     return {
@@ -132,28 +90,24 @@ export function isStillCurrentTrack(trackUri) {
   return Spicetify.Player.data?.item?.uri === trackUri;
 }
 
-export function handleCurrentTrackSkipCheck(reason = "Manual") {
+export function playPauseHandler(reason = "Manual") {
   const track = NowPlayingRuntimeState.track;
-  console.log("track", track);
   if (track) {
-    handleTrackSkipIfNeeded(track);
-  } else {
-    if (fastSkipCheck()) return;
-    handleNowPlayingTrackChange().catch(() => {});
+    skipTrackIfNeeded(track);
+    return;
   }
+
+  songChangeHandler().catch(() => {});
 }
 
-export function handleTrackSkipIfNeeded(basifyTrack) {
-  const isLocal = PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice();
-  const settings = LocalStorageManager.getSettings();
-  if (!isLocal || !settings.skipEnabled) return false;
-  const reasons = basifyTrack.getSkipReasons();
-  if (reasons.length > 0) {
-    SkipToastRenderer.bufferTrack(basifyTrack);
-    Spicetify.Player.next();
-    return true;
-  }
-  return false;
+export function skipTrackIfNeeded(basifyTrack) {
+  if (!PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice()) return false;
+
+  if (!basifyTrack.shouldSkipTrack()) return false;
+  SkipToastRenderer.show(basifyTrack);
+  Spicetify.Player.next();
+
+  return true;
 }
 
 export function renderNowPlayingTrack(basifyTrack, artistSpans) {
@@ -172,18 +126,16 @@ async function startup() {
     PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
   }
 
-  if (fastSkipCheck()) return;
-  handleNowPlayingTrackChange().catch(() => {});
+  songChangeHandler().catch(() => {});
 }
 
 function main() {
   startup().catch(() => {});
   Spicetify.Player.addEventListener("songchange", () => {
-    if (fastSkipCheck()) return;
-    handleNowPlayingTrackChange().catch(() => {});
+    songChangeHandler().catch(() => {});
   });
   Spicetify.Player.addEventListener("onplaypause", () => {
-    handleCurrentTrackSkipCheck("Play/Pause");
+    playPauseHandler("Play/Pause");
   });
   Spicetify.Platform.History.listen((location) => {
     loadArtistPage(location).catch(() => {});
