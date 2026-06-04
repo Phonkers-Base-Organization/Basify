@@ -583,10 +583,15 @@ export class SettingsMenu {
       .basify-settings-info-line { margin-top: 5px; color: var(--spice-subtext); font-size: 12px; line-height: 1.35; }
       .basify-settings-info-line a { color: var(--spice-button); text-decoration: none; }
       .basify-settings-info-line a:hover { text-decoration: underline; }
-      .basify-topbar-settings-button { width: 48px !important; height: 48px !important; min-width: 48px !important; max-width: 48px !important; padding: 0 !important; margin: 0 !important; border-radius: 50% !important; background: transparent !important; color: inherit !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; --basify-settings-button-bg: #1f1f1f; --basify-settings-button-icon: #a5a5a5; }
-      .basify-topbar-settings-button:hover { background: transparent !important; --basify-settings-button-bg: #2a2a2a; --basify-settings-button-icon: #ffffff; }
+      
+      .basify-topbar-settings-button-wrapper {--basify-settings-button-bg: var(--background-elevated-base); --basify-settings-button-icon: var(--spice-subtext); }
+      .basify-topbar-settings-button-wrapper:hover {--basify-settings-button-bg: var(--background-elevated-highlight); --basify-settings-button-icon: var(--spice-text); }
+
       .basify-topbar-settings-button svg, .basify-topbar-settings-icon { width: 48px !important; height: 48px !important; display: block !important; margin: 0 !important; flex: 0 0 auto !important; }
       .basify-topbar-settings-button-wrapper { margin-left: 12px !important; }
+
+      .basify-topbar-settings-icon rect,
+      .basify-topbar-settings-icon path { transition: fill 0.18s ease; }
     `;
     document.head.appendChild(style);
   }
