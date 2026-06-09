@@ -48,11 +48,9 @@ export class BasifyTrack {
 
   getBlockedDistributors() {
     return BLOCKED_DISTRIBUTORS.filter((blockedDistributor) => {
-      const normalizedBlockedDistributor =
-        BasifyTrack.normalizeDistributorName(blockedDistributor);
+      const normalizedBlockedDistributor = BasifyTrack.normalizeDistributorName(blockedDistributor);
       return this.distributors.some((distributorText) => {
-        const normalizedDistributorText =
-          BasifyTrack.normalizeDistributorName(distributorText);
+        const normalizedDistributorText = BasifyTrack.normalizeDistributorName(distributorText);
         return normalizedDistributorText.includes(normalizedBlockedDistributor);
       });
     });
@@ -106,17 +104,8 @@ export class BasifyTrack {
 
   getTrackTheme() {
     if (this.isDistributorBlocked()) return "blocked";
-    const labels = this.artists.flatMap((artist) =>
-      this.getArtistLabels(artist),
-    );
-    const priority = [
-      "blocked",
-      "pride",
-      "base",
-      "approved",
-      "unknown",
-      "noInfo",
-    ];
+    const labels = this.artists.flatMap((artist) => this.getArtistLabels(artist));
+    const priority = ["blocked", "pride", "base", "approved", "unknown", "noInfo"];
     return priority.find((themeStatus) => labels.includes(themeStatus)) || null;
   }
 

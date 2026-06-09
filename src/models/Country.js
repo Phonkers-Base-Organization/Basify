@@ -2,9 +2,7 @@ export class Country {
   constructor(name, emoji, countryCode = null) {
     this.name = name;
     this.emoji = emoji;
-    this.countryCode = countryCode
-      ? countryCode
-      : this.emojiToCountryCode(emoji);
+    this.countryCode = countryCode ? countryCode : this.emojiToCountryCode(emoji);
   }
 
   emojiToCountryCode(emoji) {
@@ -32,9 +30,7 @@ export class Country {
     return availableHeights.reduce((closestHeight, currentHeight) => {
       const closestDifference = Math.abs(closestHeight - height);
       const currentDifference = Math.abs(currentHeight - height);
-      return currentDifference < closestDifference
-        ? currentHeight
-        : closestHeight;
+      return currentDifference < closestDifference ? currentHeight : closestHeight;
     });
   }
 }

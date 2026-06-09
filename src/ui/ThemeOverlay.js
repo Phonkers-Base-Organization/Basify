@@ -24,9 +24,7 @@ export class NowPlayingThemeOverlayRenderer {
     const themeColor = ArtistInfoSectionRenderer.badges[themeStatus].bg;
     if (!nowPlayingBar || !themeColor) return;
     NowPlayingThemeOverlayRenderer.injectStyles();
-    let overlay = nowPlayingBar.querySelector(
-      `#${NowPlayingThemeOverlayRenderer.overlayElementId}`,
-    );
+    let overlay = nowPlayingBar.querySelector(`#${NowPlayingThemeOverlayRenderer.overlayElementId}`);
     if (!overlay) {
       overlay = document.createElement("div");
       overlay.id = NowPlayingThemeOverlayRenderer.overlayElementId;
@@ -38,9 +36,7 @@ export class NowPlayingThemeOverlayRenderer {
   }
 
   static clear() {
-    document
-      .getElementById(NowPlayingThemeOverlayRenderer.overlayElementId)
-      ?.remove();
+    document.getElementById(NowPlayingThemeOverlayRenderer.overlayElementId)?.remove();
   }
 
   static getNowPlayingBar() {
@@ -48,8 +44,7 @@ export class NowPlayingThemeOverlayRenderer {
   }
 
   static injectStyles() {
-    if (document.getElementById(NowPlayingThemeOverlayRenderer.styleElementId))
-      return;
+    if (document.getElementById(NowPlayingThemeOverlayRenderer.styleElementId)) return;
     const style = document.createElement("style");
     style.id = NowPlayingThemeOverlayRenderer.styleElementId;
     style.textContent = `

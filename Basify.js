@@ -378,6 +378,7 @@ var Basify = (function(exports) {
 			}
 		};
 		static createArtistInfoSection(artist) {
+			ArtistInfoSectionRenderer.injectStyles();
 			const section = document.createElement("div");
 			section.classList.add("basify-artist-info-section");
 			const countriesRow = document.createElement("div");
@@ -554,6 +555,39 @@ var Basify = (function(exports) {
 				minHeight: "24px"
 			});
 			return separator;
+		}
+		static injectStyles() {
+			if (document.getElementById("basify-artist-info-section-style")) return;
+			const style = document.createElement("style");
+			style.id = "basify-artist-info-section-style";
+			style.textContent = `
+      .main-entityHeader-headerText {
+        container-type: inline-size;
+        container-name: artist-header;
+      }
+
+      @container artist-header (max-width: 375px) {
+        .basify-artist-info-section {
+          flex-direction: column !important;
+          gap: 8px !important;
+          width: min-content !important;
+          align-items: start !important;
+        }
+
+        .basify-countries-row,
+        .basify-badges-row {
+          width: min-content !important;
+        }
+
+        .basify-info-separator {
+          width: 100% !important;
+          height: 1px !important;
+          min-height: 1px !important;
+          align-self: stretch !important;
+        }
+      }
+    `;
+			document.head.appendChild(style);
 		}
 	};
 	//#endregion
@@ -1123,7 +1157,7 @@ var Basify = (function(exports) {
 		}
 		static async waitForArtistPageHeaderElement(artistId, timeoutMs = 5e3) {
 			return DomObserver.waitUntil(() => {
-				const headerTitleElement = document.querySelector(".main-entityHeader-imageContainerWrapper");
+				const headerTitleElement = document.querySelector(".main-entityHeader-container.main-entityHeader-containerFlex");
 				if (!headerTitleElement) return null;
 				if (Spicetify.Platform.History.location.pathname.split("/")[2] !== artistId) return null;
 				return headerTitleElement;
@@ -2167,34 +2201,39 @@ var Basify = (function(exports) {
 	var ArtistPageHeaderRenderer = class ArtistPageHeaderRenderer {
 		static styleElementId = "basify-artist-page-header-style";
 		static apply(artistHeaderElement, artist) {
+			const originalHeaderHeight = artistHeaderElement.getBoundingClientRect().height;
 			ArtistPageHeaderRenderer.injectStyles();
-			artistHeaderElement.style.removeProperty("height");
-			artistHeaderElement.classList.add("basify-artist-header-wrapper");
-			const headerContainer = artistHeaderElement.closest(".main-entityHeader-container");
-			if (headerContainer) {
-				const originalHeight = getComputedStyle(headerContainer).height;
-				headerContainer.style.setProperty("--basify-original-header-height", originalHeight);
-				headerContainer.classList.add("basify-artist-header-container");
-			}
-			ArtistPageHeaderRenderer.resetTitleStyles(artistHeaderElement);
-			ArtistPageHeaderRenderer.applyArtistNameLink(artistHeaderElement, artist);
-			const headerTextElement = artistHeaderElement.querySelector(".main-entityHeader-headerText");
-			if (!headerTextElement) return;
-			artistHeaderElement.querySelector(".basify-artist-info-section")?.remove();
+			artistHeaderElement.style.setProperty("max-height", "fit-content", "important");
+			artistHeaderElement.style.setProperty("height", "fit-content", "important");
+			const artistLayout = artistHeaderElement.querySelector(".main-entityHeader-imageContainerWrapper");
+			artistLayout.classList.add("basify-artist-header-wrapper");
+			const artistImgElement = artistHeaderElement.querySelector(".main-entityHeader-imageContainer.main-entityHeader-imageContainerNew");
+			if (artistImgElement) artistImgElement.style.setProperty("align-self", "center", "important");
+			const artistTextLayout = artistLayout.querySelector(".main-entityHeader-headerText");
+			artistLayout.style.setProperty("height", "fit-content", "important");
+			const artistNameElement = artistTextLayout.querySelector(".main-entityHeader-title");
+			ArtistPageHeaderRenderer.resetTitleStyles(artistTextLayout);
+			artistNameElement.querySelector("span").style.setProperty("white-space", "nowrap", "important");
+			artistNameElement.querySelector("span").style.setProperty("overflow-wrap", "normal", "important");
+			artistNameElement.querySelector("span").style.setProperty("word-break", "normal", "important");
+			ArtistPageHeaderRenderer.applyArtistNameLink(artistNameElement, artist);
+			if (!artistTextLayout) return;
 			const artistInfoSection = ArtistInfoSectionRenderer.createArtistInfoSection(artist);
-			headerTextElement.appendChild(artistInfoSection);
+			artistTextLayout.querySelector(".basify-artist-info-section")?.remove();
+			artistTextLayout.appendChild(artistInfoSection);
+			if (artistTextLayout.getBoundingClientRect().height < originalHeaderHeight) {
+				artistHeaderElement.style.removeProperty("max-height");
+				artistHeaderElement.style.removeProperty("height");
+			}
 		}
 		static resetTitleStyles(artistHeaderElement) {
-			artistHeaderElement.querySelectorAll(".main-entityHeader-title, .main-entityHeader-title *").forEach((element) => {
-				element.style.removeProperty("font-size");
-				element.style.removeProperty("line-height");
-				element.style.removeProperty("white-space");
-				element.style.removeProperty("overflow-wrap");
-				element.style.removeProperty("word-break");
-			});
+			artistHeaderElement.style.removeProperty("font-size");
+			artistHeaderElement.style.removeProperty("line-height");
+			artistHeaderElement.style.removeProperty("white-space");
+			artistHeaderElement.style.removeProperty("overflow-wrap");
+			artistHeaderElement.style.removeProperty("word-break");
 		}
-		static applyArtistNameLink(artistHeaderElement, artist) {
-			const titleElement = artistHeaderElement.querySelector(".main-entityHeader-title");
+		static applyArtistNameLink(titleElement, artist) {
 			if (!titleElement || !artist?.name) return;
 			const openArtistOnPhonkersbase = () => {
 				const locale = BasifyI18n.getPhonkersbaseLocalePath();
@@ -2216,16 +2255,9 @@ var Basify = (function(exports) {
 			const style = document.createElement("style");
 			style.id = ArtistPageHeaderRenderer.styleElementId;
 			style.textContent = `
-      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper { height: auto !important; min-height: clamp(128px, calc(128px + (var(--main-view-grid-width) - 600px) / 424 * 104), 232px) !important; width: 100%; display: flex; }
-      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper .main-entityHeader-headerText { min-width: 0; max-width: 100%; }
-      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper .main-entityHeader-title { max-width: 100%; }
-      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper .main-entityHeader-title, .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper .main-entityHeader-title * { white-space: nowrap !important; overflow-wrap: normal !important; word-break: normal !important; }
-      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper .basify-artist-info-section { margin-top: 12px !important; }
-      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper .main-entityHeader-title.basify-artist-name-link { display: inline-block !important; width: fit-content !important; max-width: 100% !important; cursor: pointer; color: transparent !important; -webkit-text-fill-color: transparent; background-image: radial-gradient( ellipse at center, var(--spice-button, #1ed760) 0%, color-mix( in srgb, var(--spice-button, #1ed760) 95%, transparent ) 30%, color-mix( in srgb, var(--spice-button, #1ed760) 70%, transparent ) 52%, color-mix( in srgb, var(--spice-button, #1ed760) 35%, transparent ) 72%, transparent 100% ), linear-gradient( var(--spice-text, #ffffff), var(--spice-text, #ffffff) ); background-repeat: no-repeat; background-position: center center; background-size: 0% 0%, 100% 100%; background-clip: text; -webkit-background-clip: text; text-shadow: 0 0 0 transparent; transition: background-size 0.42s cubic-bezier(0.4, 0, 1, 1), text-shadow 0.42s ease; }
-      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper .main-entityHeader-title.basify-artist-name-link * { color: inherit !important; -webkit-text-fill-color: inherit !important; cursor: pointer; }
-      .main-entityHeader-imageContainerWrapper.basify-artist-header-wrapper .main-entityHeader-title.basify-artist-name-link:hover { background-size: 220% 500%, 100% 100%; text-shadow: 0 0 8px color-mix( in srgb, var(--spice-button, #1ed760) 32%, transparent ), 0 0 18px color-mix( in srgb, var(--spice-button, #1ed760) 16%, transparent ); transition: background-size 0.75s cubic-bezier(0.16, 1, 0.3, 1), text-shadow 0.75s cubic-bezier(0.16, 1, 0.3, 1); }
-      .main-entityHeader-container.basify-artist-header-container { height: auto !important; min-height: var(--basify-original-header-height) !important; overflow: visible !important; }
-      .main-entityHeader-container.basify-artist-header-container .main-entityHeader-imageContainer.main-entityHeader-imageContainerNew { align-self: center !important; }
+      .basify-artist-name-link { display: inline-block !important; width: fit-content !important; max-width: 100% !important; cursor: pointer; color: transparent !important; -webkit-text-fill-color: transparent; background-image: radial-gradient( ellipse at center, var(--spice-button, #1ed760) 0%, color-mix( in srgb, var(--spice-button, #1ed760) 95%, transparent ) 30%, color-mix( in srgb, var(--spice-button, #1ed760) 70%, transparent ) 52%, color-mix( in srgb, var(--spice-button, #1ed760) 35%, transparent ) 72%, transparent 100% ), linear-gradient( var(--spice-text, #ffffff), var(--spice-text, #ffffff) ); background-repeat: no-repeat; background-position: center center; background-size: 0% 0%, 100% 100%; background-clip: text; -webkit-background-clip: text; text-shadow: 0 0 0 transparent; transition: background-size 0.42s cubic-bezier(0.4, 0, 1, 1), text-shadow 0.42s ease; }
+      .basify-artist-name-link * { color: inherit !important; -webkit-text-fill-color: inherit !important; cursor: pointer; }
+      .basify-artist-name-link:hover { background-size: 220% 500%, 100% 100%; text-shadow: 0 0 8px color-mix( in srgb, var(--spice-button, #1ed760) 32%, transparent ), 0 0 18px color-mix( in srgb, var(--spice-button, #1ed760) 16%, transparent ); transition: background-size 0.75s cubic-bezier(0.16, 1, 0.3, 1), text-shadow 0.75s cubic-bezier(0.16, 1, 0.3, 1); }
     `;
 			document.head.appendChild(style);
 		}

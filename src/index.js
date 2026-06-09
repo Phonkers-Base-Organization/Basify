@@ -11,17 +11,14 @@ import { SkipToastRenderer } from "./ui/SkipToast.js";
 import { LocalStorageManager } from "./services/storage.js";
 import { PlaylistViewRenderer } from "./ui/PlaylistView.js";
 
-export async function loadArtistPage(
-  location = Spicetify.Platform.History.location,
-) {
+export async function loadArtistPage(location = Spicetify.Platform.History.location) {
   const pathParts = location.pathname.split("/");
   if (pathParts[1] !== "artist" || !pathParts[2]) return;
   const artistId = pathParts[2];
   const targetPathname = location.pathname;
   try {
     const artist = await Artist.create(artistId);
-    const artistHeaderElement =
-      await DomObserver.waitForArtistPageHeaderElement(artistId, 5000);
+    const artistHeaderElement = await DomObserver.waitForArtistPageHeaderElement(artistId, 5000);
     if (Spicetify.Platform.History.location.pathname !== targetPathname) {
       return;
     }
@@ -72,9 +69,7 @@ export async function buildNowPlayingTrackContext(spotifyTrack) {
   try {
     const [trackArtists, artistSpans, distributors] = await Promise.all([
       getTrackArtists(spotifyTrack),
-      DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5000).catch(
-        () => null,
-      ),
+      DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5000).catch(() => null),
       BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []),
     ]);
     return {

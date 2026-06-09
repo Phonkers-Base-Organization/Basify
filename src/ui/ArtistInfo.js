@@ -1,13 +1,6 @@
 import { BasifyI18n } from "../locales/index.js";
 import { LocalStorageManager } from "../services/storage.js";
-import {
-  crownSvg,
-  thumbsUpSvg,
-  starSvg,
-  warningSvg,
-  banSvg,
-  unknownSvg,
-} from "../constants/icons.js";
+import { crownSvg, thumbsUpSvg, starSvg, warningSvg, banSvg, unknownSvg } from "../constants/icons.js";
 
 export class ArtistInfoSectionRenderer {
   static badges = {
@@ -26,6 +19,8 @@ export class ArtistInfoSectionRenderer {
   };
 
   static createArtistInfoSection(artist) {
+    ArtistInfoSectionRenderer.injectStyles();
+
     const section = document.createElement("div");
     section.classList.add("basify-artist-info-section");
 
@@ -57,28 +52,18 @@ export class ArtistInfoSectionRenderer {
 
     if (artist.countries.length) {
       artist.countries.forEach((country) => {
-        countriesRow.appendChild(
-          ArtistInfoSectionRenderer.createCountryBadge(country),
-        );
+        countriesRow.appendChild(ArtistInfoSectionRenderer.createCountryBadge(country));
       });
     } else {
-      countriesRow.appendChild(
-        ArtistInfoSectionRenderer.createSimpleTag(
-          BasifyI18n.t("unknownOrigin"),
-        ),
-      );
+      countriesRow.appendChild(ArtistInfoSectionRenderer.createSimpleTag(BasifyI18n.t("unknownOrigin")));
     }
 
     if (artist.labels.length) {
       artist.labels.forEach((label) => {
-        badgesRow.appendChild(
-          ArtistInfoSectionRenderer.createTrustBadge(label, artist),
-        );
+        badgesRow.appendChild(ArtistInfoSectionRenderer.createTrustBadge(label, artist));
       });
     } else {
-      badgesRow.appendChild(
-        ArtistInfoSectionRenderer.createTrustBadge("noInfo", artist),
-      );
+      badgesRow.appendChild(ArtistInfoSectionRenderer.createTrustBadge("noInfo", artist));
     }
 
     section.appendChild(countriesRow);
@@ -114,9 +99,7 @@ export class ArtistInfoSectionRenderer {
   }
 
   static createTrustBadge(type, artist = null) {
-    const badgeData =
-      ArtistInfoSectionRenderer.badges[type] ??
-      ArtistInfoSectionRenderer.badges.noInfo;
+    const badgeData = ArtistInfoSectionRenderer.badges[type] ?? ArtistInfoSectionRenderer.badges.noInfo;
 
     const badge = document.createElement("span");
     badge.classList.add("basify-trust-badge");
@@ -139,8 +122,7 @@ export class ArtistInfoSectionRenderer {
 
     if (artist && type !== "approved") {
       const locale = LocalStorageManager.getSettings().locale;
-      const description =
-        locale === "uk" ? artist.description : artist.descriptionEn;
+      const description = locale === "uk" ? artist.description : artist.descriptionEn;
 
       if (description) {
         badge.style.cursor = "pointer";
@@ -249,5 +231,41 @@ export class ArtistInfoSectionRenderer {
       minHeight: "24px",
     });
     return separator;
+  }
+
+  static injectStyles() {
+    if (document.getElementById("basify-artist-info-section-style")) return;
+
+    const style = document.createElement("style");
+    style.id = "basify-artist-info-section-style";
+    style.textContent = `
+      .main-entityHeader-headerText {
+        container-type: inline-size;
+        container-name: artist-header;
+      }
+
+      @container artist-header (max-width: 375px) {
+        .basify-artist-info-section {
+          flex-direction: column !important;
+          gap: 8px !important;
+          width: min-content !important;
+          align-items: start !important;
+        }
+
+        .basify-countries-row,
+        .basify-badges-row {
+          width: min-content !important;
+        }
+
+        .basify-info-separator {
+          width: 100% !important;
+          height: 1px !important;
+          min-height: 1px !important;
+          align-self: stretch !important;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
   }
 }

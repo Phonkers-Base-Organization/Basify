@@ -36,9 +36,7 @@ export class LocalStorageManager {
 
   static loadData() {
     try {
-      const rawData = LocalStorageManager.storage.get(
-        LocalStorageManager.rootKey,
-      );
+      const rawData = LocalStorageManager.storage.get(LocalStorageManager.rootKey);
       if (!rawData) {
         return LocalStorageManager.createDefaultData();
       }
@@ -60,10 +58,7 @@ export class LocalStorageManager {
 
   static saveData(data) {
     try {
-      LocalStorageManager.storage.set(
-        LocalStorageManager.rootKey,
-        JSON.stringify(data),
-      );
+      LocalStorageManager.storage.set(LocalStorageManager.rootKey, JSON.stringify(data));
     } catch (error) {
       console.error("Failed to save extension storage:", error);
     }

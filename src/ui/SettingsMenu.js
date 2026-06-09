@@ -3,11 +3,7 @@ import { LocalStorageManager } from "../services/storage.js";
 import { SkipToastRenderer } from "./SkipToast.js";
 import { NowPlayingRuntimeState } from "../state/runtimeState.js";
 import { NowPlayingThemeOverlayRenderer } from "./ThemeOverlay.js";
-import {
-  refreshCurrentArtistPage,
-  skipTrackIfNeeded,
-  renderNowPlayingTrack,
-} from "../index.js";
+import { refreshCurrentArtistPage, skipTrackIfNeeded, renderNowPlayingTrack } from "../index.js";
 import { settingsSvg, phonkersbaseLogoSvg } from "../constants/icons.js";
 import { PlaylistViewRenderer } from "./PlaylistView.js";
 
@@ -66,18 +62,16 @@ export class SettingsMenu {
   static updateModalTitle(locale = BasifyI18n.getLocale()) {
     const title = BasifyI18n.t("settingsTitle", locale);
     requestAnimationFrame(() => {
-      const settingsRoot = document.querySelector(
-        ".basify-settings-react-root",
-      );
+      const settingsRoot = document.querySelector(".basify-settings-react-root");
       if (!settingsRoot) return;
       const modal =
         settingsRoot.closest('[role="dialog"]') ||
         settingsRoot.closest('[class*="Modal"]') ||
         document.querySelector('[role="dialog"]');
       if (!modal) return;
-      const titleElement = Array.from(
-        modal.querySelectorAll('h1, [class*="Title"], [class*="title"]'),
-      ).find((element) => !settingsRoot.contains(element));
+      const titleElement = Array.from(modal.querySelectorAll('h1, [class*="Title"], [class*="title"]')).find(
+        (element) => !settingsRoot.contains(element),
+      );
       if (!titleElement) return;
       titleElement.textContent = title;
     });
@@ -157,47 +151,32 @@ export class SettingsMenu {
 
   static Component() {
     const React = Spicetify.React;
-    const [settings, setSettings] = React.useState(() =>
-      LocalStorageManager.getSettings(),
-    );
+    const [settings, setSettings] = React.useState(() => LocalStorageManager.getSettings());
     const t = (key) => BasifyI18n.t(key, settings.locale);
 
     const saveSettings = async (newSettings) => {
       const updatedSettings = { ...settings, ...newSettings };
       setSettings(updatedSettings);
       await LocalStorageManager.updateSettings(newSettings);
-      SettingsMenu.applyRuntimeSettings(updatedSettings, newSettings).catch(
-        (error) => {
-          console.error("Basify failed to apply runtime settings:", error);
-        },
-      );
+      SettingsMenu.applyRuntimeSettings(updatedSettings, newSettings).catch((error) => {
+        console.error("Basify failed to apply runtime settings:", error);
+      });
     };
 
     const resetSettings = async () => {
       const defaultSettings = await LocalStorageManager.resetSettings();
       setSettings(defaultSettings);
-      SettingsMenu.applyRuntimeSettings(defaultSettings, defaultSettings).catch(
-        (error) => {
-          console.error(
-            "Basify failed to apply runtime settings after reset:",
-            error,
-          );
-        },
-      );
-      Spicetify.showNotification(
-        BasifyI18n.t("settingsResetNotification", defaultSettings.locale),
-      );
+      SettingsMenu.applyRuntimeSettings(defaultSettings, defaultSettings).catch((error) => {
+        console.error("Basify failed to apply runtime settings after reset:", error);
+      });
+      Spicetify.showNotification(BasifyI18n.t("settingsResetNotification", defaultSettings.locale));
     };
 
     const skipStatusSwitchesEnabled =
-      settings.skipBlockedArtists ||
-      settings.skipWarningArtists ||
-      settings.skipUnknownArtists;
+      settings.skipBlockedArtists || settings.skipWarningArtists || settings.skipUnknownArtists;
 
-    const skipMainSwitchEnabled =
-      settings.skipEnabled && skipStatusSwitchesEnabled;
-    const skipSubSwitchesDisabled =
-      !settings.skipEnabled && skipStatusSwitchesEnabled;
+    const skipMainSwitchEnabled = settings.skipEnabled && skipStatusSwitchesEnabled;
+    const skipSubSwitchesDisabled = !settings.skipEnabled && skipStatusSwitchesEnabled;
     const popupSubSettingsDisabled = !settings.popupEnabled;
 
     return React.createElement(
@@ -292,15 +271,13 @@ export class SettingsMenu {
         label: t("formatArtistNames"),
         description: t("formatArtistNamesDescription"),
         value: settings.formatNowPlayingArtistName,
-        onChange: (value) =>
-          saveSettings({ formatNowPlayingArtistName: value }),
+        onChange: (value) => saveSettings({ formatNowPlayingArtistName: value }),
       }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("showStatusShapes"),
         description: t("showStatusShapesDescription"),
         value: settings.showNowPlayingArtistStatusShape,
-        onChange: (value) =>
-          saveSettings({ showNowPlayingArtistStatusShape: value }),
+        onChange: (value) => saveSettings({ showNowPlayingArtistStatusShape: value }),
       }),
       React.createElement(SettingsMenu.ToggleRow, {
         label: t("showArtistFlags"),
@@ -340,19 +317,11 @@ export class SettingsMenu {
   }
 
   static SectionTitle({ title }) {
-    return Spicetify.React.createElement(
-      "h2",
-      { className: "basify-settings-section-title" },
-      title,
-    );
+    return Spicetify.React.createElement("h2", { className: "basify-settings-section-title" }, title);
   }
 
   static SubSectionTitle({ title }) {
-    return Spicetify.React.createElement(
-      "div",
-      { className: "basify-settings-subsection-title" },
-      title,
-    );
+    return Spicetify.React.createElement("div", { className: "basify-settings-subsection-title" }, title);
   }
 
   static ToggleRow({ label, description, value, disabled = false, onChange }) {
@@ -394,26 +363,13 @@ export class SettingsMenu {
           onChange: (event) => onChange(event.target.value),
         },
         options.map((option) =>
-          Spicetify.React.createElement(
-            "option",
-            { key: option.value, value: option.value },
-            option.label,
-          ),
+          Spicetify.React.createElement("option", { key: option.value, value: option.value }, option.label),
         ),
       ),
     );
   }
 
-  static NumberRow({
-    label,
-    description,
-    value,
-    min,
-    max,
-    step = 1,
-    disabled = false,
-    onChange,
-  }) {
+  static NumberRow({ label, description, value, min, max, step = 1, disabled = false, onChange }) {
     const [inputValue, setInputValue] = Spicetify.React.useState(String(value));
     Spicetify.React.useEffect(() => {
       setInputValue(String(value));
@@ -490,17 +446,9 @@ export class SettingsMenu {
     return Spicetify.React.createElement(
       "div",
       { className: "basify-settings-text-wrapper" },
-      Spicetify.React.createElement(
-        "div",
-        { className: "basify-settings-label" },
-        label,
-      ),
+      Spicetify.React.createElement("div", { className: "basify-settings-label" }, label),
       description
-        ? Spicetify.React.createElement(
-            "div",
-            { className: "basify-settings-description" },
-            description,
-          )
+        ? Spicetify.React.createElement("div", { className: "basify-settings-description" }, description)
         : null,
     );
   }

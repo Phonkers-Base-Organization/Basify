@@ -1,9 +1,5 @@
 export class DomObserver {
-  static async waitUntil(
-    conditionCallback,
-    timeoutMs = 5000,
-    intervalMs = 100,
-  ) {
+  static async waitUntil(conditionCallback, timeoutMs = 5000, intervalMs = 100) {
     const startTime = Date.now();
     return new Promise((resolve, reject) => {
       const intervalId = setInterval(() => {
@@ -27,10 +23,7 @@ export class DomObserver {
   }
 
   static async waitForElement(selector, timeoutMs = 5000) {
-    return DomObserver.waitUntil(
-      () => document.querySelector(selector),
-      timeoutMs,
-    );
+    return DomObserver.waitUntil(() => document.querySelector(selector), timeoutMs);
   }
 
   static async waitForNowPlayingArtistSpans(track, timeoutMs = 5000) {
@@ -46,11 +39,8 @@ export class DomObserver {
         return null;
       }
 
-      const trackArtistIds = (track?.artists || []).map(
-        (artist) => artist.uri.split(":")[2],
-      );
-      const bottomBarArtistSpansById =
-        DomObserver.extractArtistDataFromContainer(bottomBarArtistsContainer);
+      const trackArtistIds = (track?.artists || []).map((artist) => artist.uri.split(":")[2]);
+      const bottomBarArtistSpansById = DomObserver.extractArtistDataFromContainer(bottomBarArtistsContainer);
       const bottomBarMatchesTrackArtists = DomObserver.haveSameArtistIds(
         Object.keys(bottomBarArtistSpansById),
         trackArtistIds,
@@ -62,9 +52,7 @@ export class DomObserver {
 
       let sideViewArtistSpansById = {};
       if (sideViewArtistsContainer) {
-        sideViewArtistSpansById = DomObserver.extractArtistDataFromContainer(
-          sideViewArtistsContainer,
-        );
+        sideViewArtistSpansById = DomObserver.extractArtistDataFromContainer(sideViewArtistsContainer);
         const sideViewMatchesTrackArtists = DomObserver.haveSameArtistIds(
           Object.keys(sideViewArtistSpansById),
           trackArtistIds,
@@ -99,16 +87,12 @@ export class DomObserver {
     }
     const sortedFirstArtistIds = [...firstArtistIds].sort();
     const sortedSecondArtistIds = [...secondArtistIds].sort();
-    return sortedFirstArtistIds.every(
-      (artistId, index) => artistId === sortedSecondArtistIds[index],
-    );
+    return sortedFirstArtistIds.every((artistId, index) => artistId === sortedSecondArtistIds[index]);
   }
 
   static async waitForArtistPageHeaderElement(artistId, timeoutMs = 5000) {
     return DomObserver.waitUntil(() => {
-      const headerTitleElement = document.querySelector(
-        ".main-entityHeader-imageContainerWrapper",
-      );
+      const headerTitleElement = document.querySelector(".main-entityHeader-container.main-entityHeader-containerFlex");
       if (!headerTitleElement) return null;
       const currentPathname = Spicetify.Platform.History.location.pathname;
       const currentArtistId = currentPathname.split("/")[2];

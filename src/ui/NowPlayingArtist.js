@@ -3,15 +3,7 @@ import { crownSvg, starSvg, unknownSvg } from "../constants/icons.js";
 
 export class NowPlayingArtistRenderer {
   static styleElementId = "basify-now-playing-artist-style";
-  static labelPriority = [
-    "blocked",
-    "warning",
-    "unknown",
-    "pride",
-    "base",
-    "approved",
-    "noInfo",
-  ];
+  static labelPriority = ["blocked", "warning", "unknown", "pride", "base", "approved", "noInfo"];
 
   static statusStyles = {
     blocked: { color: "#ff4d4d", shape: "square" },
@@ -32,16 +24,8 @@ export class NowPlayingArtistRenderer {
   static render(basifyTrack, artistSpans) {
     const settings = LocalStorageManager.getSettings();
     NowPlayingArtistRenderer.injectStyles();
-    NowPlayingArtistRenderer.renderArtistSpanGroup(
-      artistSpans.bottomBarArtistSpans,
-      basifyTrack.artists,
-      settings,
-    );
-    NowPlayingArtistRenderer.renderArtistSpanGroup(
-      artistSpans.sideViewArtistSpans,
-      basifyTrack.artists,
-      settings,
-    );
+    NowPlayingArtistRenderer.renderArtistSpanGroup(artistSpans.bottomBarArtistSpans, basifyTrack.artists, settings);
+    NowPlayingArtistRenderer.renderArtistSpanGroup(artistSpans.sideViewArtistSpans, basifyTrack.artists, settings);
   }
 
   static renderArtistSpanGroup(artistSpansById, artists, settings) {
@@ -49,22 +33,16 @@ export class NowPlayingArtistRenderer {
       const artist = artists.find((trackArtist) => trackArtist.id === artistId);
       NowPlayingArtistRenderer.resetArtistSpan(artistSpan);
       if (!artist) return;
-      const dominantLabel =
-        NowPlayingArtistRenderer.getDominantArtistLabel(artist);
+      const dominantLabel = NowPlayingArtistRenderer.getDominantArtistLabel(artist);
       const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
       const artistLink = artistSpan.querySelector("a") || artistSpan;
 
       if (settings.formatNowPlayingArtistName && statusStyle?.color) {
         artistLink.classList.add("basify-now-playing-artist-name");
-        artistLink.style.setProperty(
-          "--basify-artist-status-color",
-          statusStyle.color,
-        );
+        artistLink.style.setProperty("--basify-artist-status-color", statusStyle.color);
       }
       if (settings.showNowPlayingArtistStatusShape && statusStyle) {
-        artistSpan.appendChild(
-          NowPlayingArtistRenderer.createStatusShape(dominantLabel),
-        );
+        artistSpan.appendChild(NowPlayingArtistRenderer.createStatusShape(dominantLabel));
       }
       if (settings.showNowPlayingArtistFlags && artist.countries.length) {
         artist.countries.forEach((country) => {
@@ -77,12 +55,8 @@ export class NowPlayingArtistRenderer {
   }
 
   static resetArtistSpan(artistSpan) {
-    artistSpan
-      .querySelectorAll(".basify-artist-flag")
-      .forEach((flag) => flag.remove());
-    artistSpan
-      .querySelectorAll(".basify-artist-status-shape")
-      .forEach((shape) => shape.remove());
+    artistSpan.querySelectorAll(".basify-artist-flag").forEach((flag) => flag.remove());
+    artistSpan.querySelectorAll(".basify-artist-status-shape").forEach((shape) => shape.remove());
     const artistLink = artistSpan.querySelector("a") || artistSpan;
     artistLink.classList.remove("basify-now-playing-artist-name");
     artistLink.style.removeProperty("--basify-artist-status-color");
@@ -90,17 +64,11 @@ export class NowPlayingArtistRenderer {
 
   static getDominantArtistLabel(artist) {
     const labels = artist.labels.length ? artist.labels : ["noInfo"];
-    return (
-      NowPlayingArtistRenderer.labelPriority.find((label) =>
-        labels.includes(label),
-      ) || "noInfo"
-    );
+    return NowPlayingArtistRenderer.labelPriority.find((label) => labels.includes(label)) || "noInfo";
   }
 
   static createStatusShape(label) {
-    const statusStyle =
-      NowPlayingArtistRenderer.statusStyles[label] ||
-      NowPlayingArtistRenderer.statusStyles.noInfo;
+    const statusStyle = NowPlayingArtistRenderer.statusStyles[label] || NowPlayingArtistRenderer.statusStyles.noInfo;
     const shape = document.createElement("span");
     shape.classList.add("basify-artist-status-shape");
     shape.dataset.status = label;
@@ -114,8 +82,7 @@ export class NowPlayingArtistRenderer {
   }
 
   static injectStyles() {
-    if (document.getElementById(NowPlayingArtistRenderer.styleElementId))
-      return;
+    if (document.getElementById(NowPlayingArtistRenderer.styleElementId)) return;
     const style = document.createElement("style");
     style.id = NowPlayingArtistRenderer.styleElementId;
     style.textContent = `

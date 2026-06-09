@@ -19,13 +19,11 @@ export class PlaybackDeviceMonitor {
   static check(reason = "Device check") {
     const device = PlaybackDeviceMonitor.getActiveDevice();
     const deviceId = device?.id ?? null;
-    const playingOnCurrentDevice =
-      PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice();
+    const playingOnCurrentDevice = PlaybackDeviceMonitor.isSpotifyPlayingOnCurrentDevice();
 
     const deviceChanged = deviceId !== PlaybackDeviceMonitor.lastDeviceId;
     const startedPlayingOnCurrentDevice =
-      playingOnCurrentDevice &&
-      PlaybackDeviceMonitor.lastPlayingOnCurrentDevice === false;
+      playingOnCurrentDevice && PlaybackDeviceMonitor.lastPlayingOnCurrentDevice === false;
 
     PlaybackDeviceMonitor.lastDeviceId = deviceId;
     PlaybackDeviceMonitor.lastPlayingOnCurrentDevice = playingOnCurrentDevice;
@@ -37,10 +35,7 @@ export class PlaybackDeviceMonitor {
 
       console.log(`[Basify] ${reason}`);
       console.log("[Basify] Active device:", deviceLabel);
-      console.log(
-        "[Basify] Playing on current device:",
-        playingOnCurrentDevice,
-      );
+      console.log("[Basify] Playing on current device:", playingOnCurrentDevice);
     }
 
     if (startedPlayingOnCurrentDevice) {
