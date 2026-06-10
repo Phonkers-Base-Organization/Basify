@@ -4,6 +4,11 @@ import { Country } from "./Country.js";
 export class Artist {
   static baseArtistURL = "open.spotify.com/artist/";
   static apiURL = "https://www.phonkersbase.com/api/artists?limit=50&offset=0&locale=en&search=";
+  static cacheMaxAgeMs = 24 * 60 * 60 * 1000;
+
+  static isCacheStale(artistData) {
+    return !artistData?.updatedAt || Date.now() - artistData.updatedAt > Artist.cacheMaxAgeMs;
+  }
 
   constructor(data) {
     this.id = data.id;
@@ -22,13 +27,20 @@ export class Artist {
 
   static async create(artistId, fallbackName = null) {
     const cachedArtistData = LocalStorageManager.getArtist(artistId);
-    if (cachedArtistData) {
+
+    if (cachedArtistData && !Artist.isCacheStale(cachedArtistData)) {
+      console.log("Loading artist from local storage", artistId);
       if (!cachedArtistData.name && fallbackName) {
         cachedArtistData.name = fallbackName;
       }
       const updatedArtistData = await LocalStorageManager.markArtistUsed(artistId);
       return new Artist(updatedArtistData || cachedArtistData);
     }
+
+    if (cachedArtistData && Artist.isCacheStale(cachedArtistData)) {
+      console.log("Artist information from local storage is expired", artistId);
+    }
+
     const fetchedArtistData = await Artist.fetch(artistId, fallbackName);
     const savedArtistData = await LocalStorageManager.saveArtist(fetchedArtistData);
     return new Artist(savedArtistData);
@@ -37,6 +49,8 @@ export class Artist {
   static async fetch(artistId, fallbackName = null) {
     const artistURL = Artist.baseArtistURL + artistId;
     const requestURL = Artist.apiURL + encodeURIComponent(artistURL);
+
+    console.log("Requesting artist from db", artistId);
 
     try {
       const responseData = await Spicetify.CosmosAsync.get(requestURL);

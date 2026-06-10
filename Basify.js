@@ -910,6 +910,10 @@ var Basify = (function(exports) {
 	var Artist = class Artist {
 		static baseArtistURL = "open.spotify.com/artist/";
 		static apiURL = "https://www.phonkersbase.com/api/artists?limit=50&offset=0&locale=en&search=";
+		static cacheMaxAgeMs = 1440 * 60 * 1e3;
+		static isCacheStale(artistData) {
+			return !artistData?.updatedAt || Date.now() - artistData.updatedAt > Artist.cacheMaxAgeMs;
+		}
 		constructor(data) {
 			this.id = data.id;
 			this.name = data.name;
@@ -926,16 +930,19 @@ var Basify = (function(exports) {
 		}
 		static async create(artistId, fallbackName = null) {
 			const cachedArtistData = LocalStorageManager.getArtist(artistId);
-			if (cachedArtistData) {
+			if (cachedArtistData && !Artist.isCacheStale(cachedArtistData)) {
+				console.log("Loading artist from local storage", artistId);
 				if (!cachedArtistData.name && fallbackName) cachedArtistData.name = fallbackName;
 				return new Artist(await LocalStorageManager.markArtistUsed(artistId) || cachedArtistData);
 			}
+			if (cachedArtistData && Artist.isCacheStale(cachedArtistData)) console.log("Artist information from local storage is expired", artistId);
 			const fetchedArtistData = await Artist.fetch(artistId, fallbackName);
 			return new Artist(await LocalStorageManager.saveArtist(fetchedArtistData));
 		}
 		static async fetch(artistId, fallbackName = null) {
 			const artistURL = Artist.baseArtistURL + artistId;
 			const requestURL = Artist.apiURL + encodeURIComponent(artistURL);
+			console.log("Requesting artist from db", artistId);
 			try {
 				const artistItem = (await Spicetify.CosmosAsync.get(requestURL))?.data?.items?.[0];
 				if (!artistItem) return {
@@ -2026,7 +2033,9 @@ var Basify = (function(exports) {
 		"VELVET MUSIC",
 		"GAMMA MUSIC",
 		"PEPERFUNK RECORDINGS",
-		"РНБ КЛУБ"
+		"РНБ КЛУБ",
+		"ROZETKA DIGITAL",
+		"SAIBOT Music"
 	];
 	//#endregion
 	//#region src/models/Track.js

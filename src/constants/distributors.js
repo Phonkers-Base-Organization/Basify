@@ -80,4 +80,6 @@ export const BLOCKED_DISTRIBUTORS = [
   "GAMMA MUSIC",
   "PEPERFUNK RECORDINGS",
   "РНБ КЛУБ",
+  "ROZETKA DIGITAL",
+  "SAIBOT Music",
 ];
