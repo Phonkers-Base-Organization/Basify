@@ -1,15 +1,6 @@
 export class Country {
-  constructor(name, emoji, countryCode = null) {
-    this.name = name;
-    this.emoji = emoji;
-    this.countryCode = countryCode ? countryCode : this.emojiToCountryCode(emoji);
-  }
-
-  emojiToCountryCode(emoji) {
-    return Array.from(emoji)
-      .map((c) => String.fromCharCode(c.codePointAt(0) - 127397))
-      .join("")
-      .toLowerCase();
+  constructor(countryCode = null) {
+    this.countryCode = countryCode.toLowerCase();
   }
 
   flagImg(useEmojiFlag = true, marginLeft = 0, height = 12, width = 16) {

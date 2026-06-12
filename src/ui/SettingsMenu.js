@@ -5,7 +5,7 @@ import { NowPlayingRuntimeState } from "../state/runtimeState.js";
 import { NowPlayingThemeOverlayRenderer } from "./ThemeOverlay.js";
 import { refreshCurrentArtistPage, skipTrackIfNeeded, renderNowPlayingTrack } from "../index.js";
 import { settingsSvg, phonkersbaseLogoSvg } from "../constants/icons.js";
-import { PlaylistViewRenderer } from "./PlaylistView.js";
+// import { PlaylistViewRenderer } from "./PlaylistView.js";
 
 const React = Spicetify.React;
 
@@ -119,19 +119,19 @@ export class SettingsMenu {
       }
     }
 
-    if (Object.hasOwn(changedSettings, "showPlaylistRating")) {
-      const pathParts = Spicetify.Platform.History.location.pathname.split("/");
-      if (pathParts[1] === "playlist" && pathParts[2]) {
-        PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
-      }
-    }
+    // if (Object.hasOwn(changedSettings, "showPlaylistRating")) {
+    //   const pathParts = Spicetify.Platform.History.location.pathname.split("/");
+    //   if (pathParts[1] === "playlist" && pathParts[2]) {
+    //     PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
+    //   }
+    // }
 
-    if (Object.hasOwn(changedSettings, "skipEnabled")) {
-      document.querySelectorAll('div[role="row"]').forEach((row) => {
-        row.removeAttribute("data-basify-processed");
-      });
-      PlaylistViewRenderer.scanRows();
-    }
+    // if (Object.hasOwn(changedSettings, "skipEnabled")) {
+    //   document.querySelectorAll('div[role="row"]').forEach((row) => {
+    //     row.removeAttribute("data-basify-processed");
+    //   });
+    //   PlaylistViewRenderer.scanRows();
+    // }
 
     if (emojiFlagsChanged || localeChanged) {
       refreshCurrentArtistPage().catch((error) => {

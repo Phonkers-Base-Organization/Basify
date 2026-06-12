@@ -143,7 +143,6 @@ export const BasifyLocales = {
 export class BasifyI18n {
   static defaultLocale = "en";
   static lowercaseCountryNames = {
-    "gb-sct": { en: "Scotland", uk: "Шотландія" },
     ru: { en: "russia", uk: "росія" },
     by: { en: "belarus", uk: "білорусь" },
   };

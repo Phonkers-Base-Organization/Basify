@@ -3,7 +3,7 @@ import { Country } from "./Country.js";
 
 export class Artist {
   static baseArtistURL = "open.spotify.com/artist/";
-  static apiURL = "https://www.phonkersbase.com/api/artists?limit=50&offset=0&locale=en&search=";
+  static apiURL = "https://api.phonkersbase.com/api/v1/artist/all?search=";
   static cacheMaxAgeMs = 24 * 60 * 60 * 1000;
 
   static isCacheStale(artistData) {
@@ -16,10 +16,7 @@ export class Artist {
     this.url = data.url;
     this.description = data.description || null;
     this.descriptionEn = data.descriptionEn || null;
-    this.countries = (data.countries || []).map((country) => {
-      if (country instanceof Country) return country;
-      return new Country(country.name, country.emoji, country.countryCode);
-    });
+    this.countries = (data.countries || []).map((country) => new Country(country.countryCode));
     this.labels = data.labels || [];
     this.updatedAt = data.updatedAt || Date.now();
     this.lastUsedAt = data.lastUsedAt || Date.now();
@@ -48,13 +45,13 @@ export class Artist {
 
   static async fetch(artistId, fallbackName = null) {
     const artistURL = Artist.baseArtistURL + artistId;
-    const requestURL = Artist.apiURL + encodeURIComponent(artistURL);
+    const requestURL = Artist.apiURL + encodeURIComponent(artistId);
 
     console.log("Requesting artist from db", artistId);
 
     try {
-      const responseData = await Spicetify.CosmosAsync.get(requestURL);
-      const artistItem = responseData?.data?.items?.[0];
+      const responseData = await fetch(requestURL, { method: "GET", headers: { Accept: "application/json" } });
+      const artistItem = JSON.parse(await responseData.text()).items[0];
 
       if (!artistItem) {
         return {
@@ -74,16 +71,7 @@ export class Artist {
         url: artistURL,
         description: artistItem.description || null,
         descriptionEn: artistItem.descriptionEn || null,
-        countries: (artistItem.countries || []).map((countryData) => {
-          const countryInfo = countryData.originalName?.split(" ") || [];
-          const countryEmoji = countryInfo[0];
-          const countryName = countryInfo.slice(1).join(" ");
-          if (countryName === "ruzzia") return new Country("russia", "🇷🇺");
-          if (countryName === "belarus") return new Country("belarus", "🇧🇾");
-          if (countryName === "Scotland") return new Country(countryName, countryEmoji, "gb-sct");
-          if (countryName === "Syria") return new Country(countryName, countryEmoji, "sy");
-          return new Country(countryName, countryEmoji);
-        }),
+        countries: (artistItem.countries || []).map((countryData) => new Country(countryData.code)),
         labels: (artistItem.listenLabels || []).map((labelData) => labelData.name),
       };
     } catch (e) {

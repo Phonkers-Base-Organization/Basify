@@ -9,7 +9,7 @@ import { NowPlayingArtistRenderer } from "./ui/NowPlayingArtist.js";
 import { ArtistPageHeaderRenderer } from "./ui/ArtistHeader.js";
 import { SkipToastRenderer } from "./ui/SkipToast.js";
 import { LocalStorageManager } from "./services/storage.js";
-import { PlaylistViewRenderer } from "./ui/PlaylistView.js";
+// import { PlaylistViewRenderer } from "./ui/PlaylistView.js";
 
 export async function loadArtistPage(location = Spicetify.Platform.History.location) {
   const pathParts = location.pathname.split("/");
@@ -113,13 +113,13 @@ export function renderNowPlayingTrack(basifyTrack, artistSpans) {
 async function startup() {
   SettingsMenu.registerButton();
   PlaybackDeviceMonitor.start();
-  PlaylistViewRenderer.start();
+  // PlaylistViewRenderer.start();
   loadArtistPage().catch(() => {});
 
-  const pathParts = Spicetify.Platform.History.location.pathname.split("/");
-  if (pathParts[1] === "playlist" && pathParts[2]) {
-    PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
-  }
+  // const pathParts = Spicetify.Platform.History.location.pathname.split("/");
+  // if (pathParts[1] === "playlist" && pathParts[2]) {
+  //   PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
+  // }
 
   songChangeHandler().catch(() => {});
 }
@@ -135,16 +135,16 @@ function main() {
   Spicetify.Platform.History.listen((location) => {
     loadArtistPage(location).catch(() => {});
 
-    const pathParts = location.pathname.split("/");
-    if (pathParts[1] === "playlist" && pathParts[2]) {
-      setTimeout(() => {
-        PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
-      }, 600);
-    }
+    // const pathParts = location.pathname.split("/");
+    // if (pathParts[1] === "playlist" && pathParts[2]) {
+    //   setTimeout(() => {
+    //     PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
+    //   }, 600);
+    // }
 
-    setTimeout(() => {
-      PlaylistViewRenderer.start();
-    }, 400);
+    // setTimeout(() => {
+    //   PlaylistViewRenderer.start();
+    // }, 400);
   });
 }
 
