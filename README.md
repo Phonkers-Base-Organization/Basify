@@ -53,6 +53,8 @@ Common install commands:
 
 Windows PowerShell:
 
+Open **Windows PowerShell with normal user privileges**. Do **not** run it as Administrator unless the official Spicetify guide specifically tells you to.
+
 ```powershell
 iwr -useb https://raw.githubusercontent.com/spicetify/cli/main/install.ps1 | iex
 ```
@@ -140,13 +142,38 @@ spicetify apply
 
 Spotify Desktop updates can overwrite or change files that Spicetify modifies. When this happens, Basify or other Spicetify extensions may temporarily disappear, stop loading, or behave incorrectly.
 
-After Spotify updates, update or re-apply Spicetify as recommended in the [official Spicetify FAQ](https://spicetify.app/docs/faq.html):
+After every Spotify update, re-apply Spicetify:
 
 ```bash
 spicetify backup apply
 ```
 
-If Spicetify itself is outdated, follow the [official Spicetify installation guide](https://spicetify.app/docs/getting-started.html) to update or reinstall it for your operating system.
+If Spotify still looks broken, Marketplace is missing, or extensions do not load, try a full restore and re-apply:
+
+```bash
+spicetify restore backup apply
+```
+
+If Spicetify itself is outdated, update it:
+
+```bash
+spicetify update
+```
+
+Then apply Spicetify again:
+
+```bash
+spicetify backup apply
+```
+
+If Basify disappeared after a Spotify or Spicetify update, install it again from Marketplace. If you installed Basify manually, copy the latest `Basify.js` back into the Spicetify `Extensions` folder and run:
+
+```bash
+spicetify config extensions Basify.js
+spicetify apply
+```
+
+If no Spicetify update is available yet, the new Spotify version may not be supported by Spicetify. In that case, check the [official Spicetify installation guide](https://spicetify.app/docs/getting-started.html) and [official Spicetify FAQ](https://spicetify.app/docs/faq.html) for the latest instructions.
 
 ## Removing Basify
 

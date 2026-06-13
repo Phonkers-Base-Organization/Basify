@@ -539,19 +539,8 @@ class LocalStorageManager {
 }
 
 class Country {
-  constructor(name, emoji, countryCode = null) {
-    this.name = name;
-    this.emoji = emoji;
-    this.countryCode = countryCode
-      ? countryCode
-      : this.emojiToCountryCode(emoji);
-  }
-
-  emojiToCountryCode(emoji) {
-    return Array.from(emoji)
-      .map((c) => String.fromCharCode(c.codePointAt(0) - 127397))
-      .join("")
-      .toLowerCase();
+  constructor(countryCode) {
+    this.countryCode = countryCode.toLowerCase();
   }
 
   flagImg(useEmojiFlag = true, marginLeft = 0, height = 12, width = 16) {
@@ -586,31 +575,40 @@ class Country {
 
 class Artist {
   static baseArtistURL = "open.spotify.com/artist/";
+  static apiURL = "https://api.phonkersbase.com/api/v1/artist/all?search=";
+  static cacheMaxAgeMs = 24 * 60 * 60 * 1000;
 
-  static apiURL =
-    "https://www.phonkersbase.com/api/artists?limit=50&offset=0&locale=en&search=";
+  static isCacheStale(artistData) {
+    return (
+      !artistData?.updatedAt ||
+      Date.now() - artistData.updatedAt > Artist.cacheMaxAgeMs
+    );
+  }
 
   constructor(data) {
     this.id = data.id;
     this.name = data.name;
     this.url = data.url;
+    this.description = data.description || null;
+    this.descriptionEn = data.descriptionEn || null;
     this.countries = (data.countries || []).map((country) => {
-      if (country instanceof Country) {
-        return country;
-      }
-
-      return new Country(country.name, country.emoji, country.countryCode);
+      if (country instanceof Country) return country;
+      return new Country(country.countryCode);
     });
     this.labels = data.labels || [];
     this.updatedAt = data.updatedAt || Date.now();
     this.lastUsedAt = data.lastUsedAt || Date.now();
   }
 
-  static async create(artistId) {
+  static async create(artistId, fallbackName = null) {
     const cachedArtistData = LocalStorageManager.getArtist(artistId);
 
-    if (cachedArtistData) {
+    if (cachedArtistData && !Artist.isCacheStale(cachedArtistData)) {
       console.log("Loading artist from local storage", artistId);
+
+      if (!cachedArtistData.name && fallbackName) {
+        cachedArtistData.name = fallbackName;
+      }
 
       const updatedArtistData =
         await LocalStorageManager.markArtistUsed(artistId);
@@ -618,7 +616,11 @@ class Artist {
       return new Artist(updatedArtistData || cachedArtistData);
     }
 
-    const fetchedArtistData = await Artist.fetch(artistId);
+    if (cachedArtistData && Artist.isCacheStale(cachedArtistData)) {
+      console.log("Artist information from local storage is expired", artistId);
+    }
+
+    const fetchedArtistData = await Artist.fetch(artistId, fallbackName);
 
     const savedArtistData =
       await LocalStorageManager.saveArtist(fetchedArtistData);
@@ -626,60 +628,65 @@ class Artist {
     return new Artist(savedArtistData);
   }
 
-  static async fetch(artistId) {
-    const artistURL = Artist.baseArtistURL + artistId;
-    const requestURL = Artist.apiURL + encodeURIComponent(artistURL);
+  static async fetch(artistId, fallbackName = null) {
+    const requestURL = Artist.apiURL + encodeURIComponent(artistId);
 
     console.log("Requesting artist from db", artistId);
 
-    const responseData = await Spicetify.CosmosAsync.get(requestURL);
+    try {
+      const response = await fetch(requestURL, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
-    const artistItem = responseData?.data?.items?.[0];
+      if (!response.ok) {
+        throw new Error(`Phonkersbase API failed: ${response.status}`);
+      }
 
-    if (!artistItem) {
-      return {
-        id: artistId,
-        name: null,
-        url: artistURL,
-        countries: [],
-        labels: [],
-      };
+      const responseJson = await response.json();
+      const artistItem = responseJson?.items?.[0];
+
+      if (!artistItem) {
+        return Artist.createFallbackArtistData(artistId, fallbackName);
+      }
+
+      return Artist.fromApiArtistItem(artistItem, artistId, fallbackName);
+    } catch (e) {
+      console.warn("Basify failed to load artist from Phonkersbase:", e);
+      return Artist.createFallbackArtistData(artistId, fallbackName);
     }
+  }
+
+  static fromApiArtistItem(artistItem, artistId, fallbackName = null) {
+    const spotifyId = artistItem.spotifyId || artistId;
+    const artistURL = Artist.baseArtistURL + spotifyId;
 
     return {
-      id: artistId,
-      name: artistItem.name || null,
+      id: spotifyId,
+      name: artistItem.name || fallbackName,
       url: artistURL,
-
+      description: artistItem.description || null,
+      descriptionEn: artistItem.descriptionEn || null,
       countries: (artistItem.countries || []).map((countryData) => {
-        const countryInfo = countryData.originalName?.split(" ") || [];
-
-        const countryEmoji = countryInfo[0];
-        const countryName = countryInfo.slice(1).join(" ");
-
-        if (countryName === "ruzzia") {
-          return new Country("russia", "🇷🇺");
-        }
-
-        if (countryName === "belarus") {
-          return new Country("belarus", "🇧🇾");
-        }
-
-        if (countryName === "Scotland") {
-          console.log(countryName, countryEmoji);
-          return new Country(countryName, countryEmoji, "gb-sct");
-        }
-
-        if (countryName === "Syria") {
-          return new Country(countryName, countryEmoji, "sy");
-        }
-
-        return new Country(countryName, countryEmoji);
+        return new Country(countryData.code);
       }),
-
       labels: (artistItem.listenLabels || []).map((labelData) => {
         return labelData.name;
       }),
+    };
+  }
+
+  static createFallbackArtistData(artistId, fallbackName = null) {
+    return {
+      id: artistId,
+      name: fallbackName,
+      url: Artist.baseArtistURL + artistId,
+      countries: [],
+      labels: [],
+      description: null,
+      descriptionEn: null,
     };
   }
 }
@@ -3312,13 +3319,12 @@ async function refreshCurrentArtistPage() {
 }
 
 async function getTrackArtists(track) {
-  const artistIds = (track?.artists || []).map((artist) => {
-    return artist.uri.split(":")[2];
-  });
+  const artistsData = track?.artists || [];
 
   return Promise.all(
-    artistIds.map((artistId) => {
-      return Artist.create(artistId);
+    artistsData.map((artist) => {
+      const artistId = artist.uri.split(":")[2];
+      return Artist.create(artistId, artist.name);
     }),
   );
 }
