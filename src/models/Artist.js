@@ -54,36 +54,113 @@ export class Artist {
       const artistItem = JSON.parse(await responseData.text()).items[0];
 
       if (!artistItem) {
-        return {
-          id: artistId,
-          name: fallbackName,
-          url: artistURL,
-          countries: [],
-          labels: [],
-          description: null,
-          descriptionEn: null,
-        };
+        return Artist.createFallbackArtistData(artistId, fallbackName);
       }
 
-      return {
-        id: artistId,
-        name: artistItem.name || fallbackName,
-        url: artistURL,
-        description: artistItem.description || null,
-        descriptionEn: artistItem.descriptionEn || null,
-        countries: (artistItem.countries || []).map((countryData) => new Country(countryData.code)),
-        labels: (artistItem.listenLabels || []).map((labelData) => labelData.name),
-      };
+      return Artist.fromApiArtistItem(artistItem, artistId, fallbackName);
     } catch (e) {
-      return {
-        id: artistId,
-        name: fallbackName,
-        url: artistURL,
-        countries: [],
-        labels: [],
-        description: null,
-        descriptionEn: null,
-      };
+      return Artist.createFallbackArtistData(artistId, fallbackName);
     }
+  }
+
+  static async createMany(artistsData) {
+    const artistsById = {};
+    const missingArtists = [];
+
+    artistsData.forEach(({ id, name }) => {
+      if (!id) return;
+
+      const cachedArtistData = LocalStorageManager.getArtist(id);
+
+      if (cachedArtistData && !Artist.isCacheStale(cachedArtistData)) {
+        if (!cachedArtistData.name && name) {
+          cachedArtistData.name = name;
+        }
+
+        artistsById[id] = new Artist(cachedArtistData);
+        LocalStorageManager.markArtistUsed(id).catch(() => {});
+        return;
+      }
+
+      missingArtists.push({ id, name: name || null });
+    });
+
+    if (!missingArtists.length) {
+      return artistsById;
+    }
+
+    const fetchedArtistsData = await Artist.fetchMany(missingArtists);
+
+    const savedArtistsData = await Promise.all(
+      fetchedArtistsData.map((artistData) => LocalStorageManager.saveArtist(artistData)),
+    );
+
+    savedArtistsData.forEach((artistData) => {
+      artistsById[artistData.id] = new Artist(artistData);
+    });
+
+    return artistsById;
+  }
+
+  static async fetchMany(artistsData) {
+    const artistIds = artistsData.map((artist) => artist.id);
+    const requestURL = Artist.apiURL + encodeURIComponent(artistIds.join(","));
+
+    console.log("[Basify] Requesting artists from db:", artistIds);
+
+    try {
+      const responseData = await fetch(requestURL, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+
+      const responseJson = JSON.parse(await responseData.text());
+      const artistItems = responseJson.items || [];
+
+      const artistsBySpotifyId = {};
+      artistItems.forEach((artistItem) => {
+        if (!artistItem.spotifyId) return;
+        artistsBySpotifyId[artistItem.spotifyId] = artistItem;
+      });
+
+      return artistsData.map(({ id, name }) => {
+        const artistItem = artistsBySpotifyId[id];
+
+        if (!artistItem) {
+          return Artist.createFallbackArtistData(id, name);
+        }
+
+        return Artist.fromApiArtistItem(artistItem, id, name);
+      });
+    } catch (e) {
+      return artistsData.map(({ id, name }) => Artist.createFallbackArtistData(id, name));
+    }
+  }
+
+  static fromApiArtistItem(artistItem, artistId, fallbackName = null) {
+    const spotifyId = artistItem.spotifyId || artistId;
+    const artistURL = Artist.baseArtistURL + spotifyId;
+
+    return {
+      id: spotifyId,
+      name: artistItem.name || fallbackName,
+      url: artistURL,
+      description: artistItem.description || null,
+      descriptionEn: artistItem.descriptionEn || null,
+      countries: (artistItem.countries || []).map((countryData) => new Country(countryData.code)),
+      labels: (artistItem.listenLabels || []).map((labelData) => labelData.name),
+    };
+  }
+
+  static createFallbackArtistData(artistId, fallbackName = null) {
+    return {
+      id: artistId,
+      name: fallbackName,
+      url: Artist.baseArtistURL + artistId,
+      countries: [],
+      labels: [],
+      description: null,
+      descriptionEn: null,
+    };
   }
 }

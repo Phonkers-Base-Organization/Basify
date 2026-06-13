@@ -29,7 +29,7 @@ export class LocalStorageManager {
         showNowPlayingArtistStatusShape: true,
         showNowPlayingArtistFlags: true,
         showPlaylistRating: true,
-        artistCacheLimit: 50,
+        artistCacheLimit: 100,
       },
     };
   }

@@ -25,7 +25,7 @@ var Basify = (function(exports) {
 					showNowPlayingArtistStatusShape: true,
 					showNowPlayingArtistFlags: true,
 					showPlaylistRating: true,
-					artistCacheLimit: 50
+					artistCacheLimit: 100
 				}
 			};
 		}
@@ -1322,7 +1322,7 @@ var Basify = (function(exports) {
 			return new Artist(await LocalStorageManager.saveArtist(fetchedArtistData));
 		}
 		static async fetch(artistId, fallbackName = null) {
-			const artistURL = Artist.baseArtistURL + artistId;
+			Artist.baseArtistURL + artistId;
 			const requestURL = Artist.apiURL + encodeURIComponent(artistId);
 			console.log("Requesting artist from db", artistId);
 			try {
@@ -1331,35 +1331,83 @@ var Basify = (function(exports) {
 					headers: { Accept: "application/json" }
 				});
 				const artistItem = JSON.parse(await responseData.text()).items[0];
-				if (!artistItem) return {
-					id: artistId,
-					name: fallbackName,
-					url: artistURL,
-					countries: [],
-					labels: [],
-					description: null,
-					descriptionEn: null
-				};
-				return {
-					id: artistId,
-					name: artistItem.name || fallbackName,
-					url: artistURL,
-					description: artistItem.description || null,
-					descriptionEn: artistItem.descriptionEn || null,
-					countries: (artistItem.countries || []).map((countryData) => new Country(countryData.code)),
-					labels: (artistItem.listenLabels || []).map((labelData) => labelData.name)
-				};
+				if (!artistItem) return Artist.createFallbackArtistData(artistId, fallbackName);
+				return Artist.fromApiArtistItem(artistItem, artistId, fallbackName);
 			} catch (e) {
-				return {
-					id: artistId,
-					name: fallbackName,
-					url: artistURL,
-					countries: [],
-					labels: [],
-					description: null,
-					descriptionEn: null
-				};
+				return Artist.createFallbackArtistData(artistId, fallbackName);
 			}
+		}
+		static async createMany(artistsData) {
+			const artistsById = {};
+			const missingArtists = [];
+			artistsData.forEach(({ id, name }) => {
+				if (!id) return;
+				const cachedArtistData = LocalStorageManager.getArtist(id);
+				if (cachedArtistData && !Artist.isCacheStale(cachedArtistData)) {
+					if (!cachedArtistData.name && name) cachedArtistData.name = name;
+					artistsById[id] = new Artist(cachedArtistData);
+					LocalStorageManager.markArtistUsed(id).catch(() => {});
+					return;
+				}
+				missingArtists.push({
+					id,
+					name: name || null
+				});
+			});
+			if (!missingArtists.length) return artistsById;
+			const fetchedArtistsData = await Artist.fetchMany(missingArtists);
+			(await Promise.all(fetchedArtistsData.map((artistData) => LocalStorageManager.saveArtist(artistData)))).forEach((artistData) => {
+				artistsById[artistData.id] = new Artist(artistData);
+			});
+			return artistsById;
+		}
+		static async fetchMany(artistsData) {
+			const artistIds = artistsData.map((artist) => artist.id);
+			const requestURL = Artist.apiURL + encodeURIComponent(artistIds.join(","));
+			console.log("[Basify] Requesting artists from db:", artistIds);
+			try {
+				const responseData = await fetch(requestURL, {
+					method: "GET",
+					headers: { Accept: "application/json" }
+				});
+				const artistItems = JSON.parse(await responseData.text()).items || [];
+				const artistsBySpotifyId = {};
+				artistItems.forEach((artistItem) => {
+					if (!artistItem.spotifyId) return;
+					artistsBySpotifyId[artistItem.spotifyId] = artistItem;
+				});
+				return artistsData.map(({ id, name }) => {
+					const artistItem = artistsBySpotifyId[id];
+					if (!artistItem) return Artist.createFallbackArtistData(id, name);
+					return Artist.fromApiArtistItem(artistItem, id, name);
+				});
+			} catch (e) {
+				return artistsData.map(({ id, name }) => Artist.createFallbackArtistData(id, name));
+			}
+		}
+		static fromApiArtistItem(artistItem, artistId, fallbackName = null) {
+			const spotifyId = artistItem.spotifyId || artistId;
+			const artistURL = Artist.baseArtistURL + spotifyId;
+			return {
+				id: spotifyId,
+				name: artistItem.name || fallbackName,
+				url: artistURL,
+				description: artistItem.description || null,
+				descriptionEn: artistItem.descriptionEn || null,
+				countries: (artistItem.countries || []).map((countryData) => new Country(countryData.code)),
+				labels: (artistItem.listenLabels || []).map((labelData) => labelData.name)
+			};
+		}
+		static createFallbackArtistData(artistId, fallbackName = null) {
+			return {
+				id: artistId,
+				name: fallbackName,
+				url: Artist.baseArtistURL + artistId,
+				countries: [],
+				labels: [],
+				description: null,
+				descriptionEn: null
+			};
 		}
 	};
 	//#endregion
@@ -1964,7 +2012,54 @@ var Basify = (function(exports) {
 		Spicetify.Player.addEventListener("onplaypause", () => {
 			playPauseHandler("Play/Pause");
 		});
-		Spicetify.Platform.History.listen((location) => {
+		Spicetify.Platform.History.listen(async (location) => {
+			console.log(location);
+			if (location.pathname.split("/")[1] === "playlist") {
+				const startTime = performance.now();
+				const playlistUri = "spotify:playlist:" + location.pathname.split("/")[2];
+				let allTracks = [];
+				let offset = 0;
+				const limit = 200;
+				let hasMore = true;
+				console.log(`[Basify] Requesting metadata for playlist: ${location.pathname.split("/")[2]}`);
+				while (hasMore) {
+					const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, {
+						offset,
+						limit
+					}).catch(() => null);
+					if (!contents || !contents.items || contents.items.length === 0) {
+						hasMore = false;
+						break;
+					}
+					allTracks.push(...await Promise.all(contents.items.map(async (track) => ({
+						...track,
+						distributors: await BasifyTrack.getDistributorsFromSpotifyTrack(track)
+					}))));
+					offset += limit;
+					if (contents.items.length < limit) hasMore = false;
+				}
+				const distributorsLoadingTime = performance.now();
+				console.log(`[Basify] All playlist tracks with distributors:`, allTracks, ` took `, (distributorsLoadingTime - startTime).toFixed(2), `ms`);
+				const uniqueArtistIds = {};
+				allTracks.forEach((track) => {
+					(track.artists || []).forEach((artist) => {
+						const id = artist.uri?.split(":")?.[2];
+						if (!id) return;
+						if (!uniqueArtistIds[id]) uniqueArtistIds[id] = {
+							id,
+							name: artist.name || null
+						};
+					});
+				});
+				const artistsData = Object.values(uniqueArtistIds);
+				const uniqueArtistIdsLoadingTime = performance.now();
+				console.log(`[Basify] All unique artist Ids:`, artistsData, ` took `, (uniqueArtistIdsLoadingTime - distributorsLoadingTime).toFixed(2), `ms`);
+				const artists = await Artist.createMany(artistsData);
+				const loadingAllArtistsTime = performance.now();
+				console.log(`[Basify] All unique artist info:`, artists, ` took `, (loadingAllArtistsTime - uniqueArtistIdsLoadingTime).toFixed(2), `ms`);
+				const endTime = performance.now();
+				console.log(`[Basify] Total playlist loading time`, (endTime - startTime).toFixed(2), `ms`);
+			}
 			loadArtistPage(location).catch(() => {});
 		});
 	}

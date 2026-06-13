@@ -132,7 +132,95 @@ function main() {
   Spicetify.Player.addEventListener("onplaypause", () => {
     playPauseHandler("Play/Pause");
   });
-  Spicetify.Platform.History.listen((location) => {
+  Spicetify.Platform.History.listen(async (location) => {
+    console.log(location);
+    if (location.pathname.split("/")[1] === "playlist") {
+      const startTime = performance.now();
+
+      const playlistUri = "spotify:playlist:" + location.pathname.split("/")[2];
+      let allTracks = [];
+      let offset = 0;
+      const limit = 200;
+      let hasMore = true;
+
+      console.log(`[Basify] Requesting metadata for playlist: ${location.pathname.split("/")[2]}`);
+
+      while (hasMore) {
+        const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, { offset, limit }).catch(
+          () => null,
+        );
+        if (!contents || !contents.items || contents.items.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        allTracks.push(
+          ...(await Promise.all(
+            contents.items.map(async (track) => ({
+              ...track,
+              distributors: await BasifyTrack.getDistributorsFromSpotifyTrack(track),
+            })),
+          )),
+        );
+
+        offset += limit;
+
+        if (contents.items.length < limit) {
+          hasMore = false;
+        }
+      }
+
+      const distributorsLoadingTime = performance.now();
+      console.log(
+        `[Basify] All playlist tracks with distributors:`,
+        allTracks,
+        ` took `,
+        (distributorsLoadingTime - startTime).toFixed(2),
+        `ms`,
+      );
+
+      const uniqueArtistIds = {};
+
+      allTracks.forEach((track) => {
+        (track.artists || []).forEach((artist) => {
+          const id = artist.uri?.split(":")?.[2];
+          if (!id) return;
+
+          if (!uniqueArtistIds[id]) {
+            uniqueArtistIds[id] = {
+              id,
+              name: artist.name || null,
+            };
+          }
+        });
+      });
+
+      const artistsData = Object.values(uniqueArtistIds);
+
+      const uniqueArtistIdsLoadingTime = performance.now();
+      console.log(
+        `[Basify] All unique artist Ids:`,
+        artistsData,
+        ` took `,
+        (uniqueArtistIdsLoadingTime - distributorsLoadingTime).toFixed(2),
+        `ms`,
+      );
+
+      const artists = await Artist.createMany(artistsData);
+
+      const loadingAllArtistsTime = performance.now();
+      console.log(
+        `[Basify] All unique artist info:`,
+        artists,
+        ` took `,
+        (loadingAllArtistsTime - uniqueArtistIdsLoadingTime).toFixed(2),
+        `ms`,
+      );
+
+      const endTime = performance.now();
+      console.log(`[Basify] Total playlist loading time`, (endTime - startTime).toFixed(2), `ms`);
+    }
+
     loadArtistPage(location).catch(() => {});
 
     // const pathParts = location.pathname.split("/");
