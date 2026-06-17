@@ -1,22 +1,115 @@
 import { BasifyI18n } from "../locales/index.js";
 import { LocalStorageManager } from "../services/storage.js";
 import { BLOCKED_DISTRIBUTORS } from "../constants/distributors.js";
+import { Artist } from "./Artist.js";
+import { DomObserver } from "../utils/domObserver.js";
 
 export class BasifyTrack {
-  constructor(spotifyTrack, trackArtists, distributors = []) {
-    this.raw = spotifyTrack;
-    this.uri = spotifyTrack.uri;
-    this.id = spotifyTrack.uri?.split(":")?.[2] || null;
-    this.name = spotifyTrack.name || BasifyI18n.t("unknownTrack");
+  constructor(data, trackArtists = []) {
+    trackArtists = trackArtists || [];
+    this.id = data.id;
+    this.uri = data.uri;
+    this.name = data.name;
+    this.albumUri = data.albumUri || null;
+    this.imageUrl = data.imageUrl || null;
+    this.distributors = data.distributors || [];
+    this.artistIds = data.artistIds || trackArtists.map((artist) => artist.id);
     this.artistsById = {};
     trackArtists.forEach((artist) => {
       this.artistsById[artist.id] = artist;
     });
-    this.distributors = distributors;
+    this.updatedAt = data.updatedAt || Date.now();
+    this.lastUsedAt = data.lastUsedAt || Date.now();
   }
 
   get artists() {
     return Object.values(this.artistsById);
+  }
+
+  static async create(spotifyTrack, trackArtists = []) {
+    const trackId = spotifyTrack.uri?.split(":")?.[2] || null;
+    const cachedTrackData = trackId ? LocalStorageManager.getTrack(trackId) : null;
+
+    if (cachedTrackData) {
+      console.log("Loading track from local storage", trackId);
+      const updatedTrackData = await LocalStorageManager.markTrackUsed(trackId);
+      return new BasifyTrack(updatedTrackData || cachedTrackData, trackArtists);
+    }
+
+    const fetchedTrackData = await BasifyTrack.fetch(spotifyTrack, trackArtists);
+    const savedTrackData = await LocalStorageManager.saveTrack(fetchedTrackData);
+    return new BasifyTrack(savedTrackData, trackArtists);
+  }
+
+  static async getTrackArtists(spotifyTrack) {
+    const artistsData = spotifyTrack?.artists || [];
+    return Promise.all(artistsData.map((a) => Artist.create(a.uri.split(":")[2], a.name)));
+  }
+
+  static async createFromNowPlaying(spotifyTrack) {
+    try {
+      const [trackArtists, artistSpans] = await Promise.all([
+        BasifyTrack.getTrackArtists(spotifyTrack),
+        DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5000).catch(() => null),
+      ]);
+      const basifyTrack = await BasifyTrack.create(spotifyTrack, trackArtists);
+      return { basifyTrack, artistSpans };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  static async fetch(spotifyTrack, trackArtists = []) {
+    const distributors = await BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []);
+
+    console.log("Requesting track info from Spotify", spotifyTrack.uri.split(":")[2]);
+
+    return {
+      id: spotifyTrack.uri?.split(":")?.[2] || null,
+      uri: spotifyTrack.uri,
+      name: spotifyTrack.name || BasifyI18n.t("unknownTrack"),
+      albumUri: spotifyTrack.album?.uri || null,
+      imageUrl: BasifyTrack.getTrackImageUrl(spotifyTrack),
+      artistIds: trackArtists.map((artist) => artist.id),
+      distributors,
+    };
+  }
+
+  static async createMany(items) {
+    const tracksById = {};
+    const missingItems = [];
+
+    items.forEach(({ track, trackArtists = [] }) => {
+      const id = track.uri?.split(":")?.[2];
+      if (!id) return;
+
+      const cachedTrackData = LocalStorageManager.getTrack(id);
+
+      if (cachedTrackData) {
+        tracksById[id] = new BasifyTrack(cachedTrackData, trackArtists);
+        LocalStorageManager.markTrackUsed(id).catch(() => {});
+        return;
+      }
+
+      missingItems.push({ track, trackArtists });
+    });
+
+    if (!missingItems.length) {
+      return tracksById;
+    }
+
+    const fetchedTracksData = await Promise.all(
+      missingItems.map(({ track, trackArtists }) => BasifyTrack.fetch(track, trackArtists)),
+    );
+
+    const savedTracksData = await LocalStorageManager.saveTrack(fetchedTracksData);
+
+    savedTracksData.forEach((trackData, index) => {
+      const { trackArtists } = missingItems[index];
+      tracksById[trackData.id] = new BasifyTrack(trackData, trackArtists);
+    });
+
+    return tracksById;
   }
 
   static async getDistributorsFromSpotifyTrack(spotifyTrack) {
@@ -110,9 +203,8 @@ export class BasifyTrack {
   }
 
   async getDominantColor() {
-    const imageUrl = BasifyTrack.getTrackImageUrl(this.raw);
-    if (!imageUrl) return null;
-    return BasifyTrack.extractDominantColorFromImage(imageUrl);
+    if (!this.imageUrl) return null;
+    return BasifyTrack.extractDominantColorFromImage(this.imageUrl);
   }
 
   static getTrackImageUrl(spotifyTrack) {

@@ -10,6 +10,8 @@ var Basify = (function(exports) {
 		static createDefaultData() {
 			return {
 				artistsById: {},
+				tracksById: {},
+				playlistsById: {},
 				settings: {
 					locale: BasifyI18n.getInitialLocale(),
 					skipEnabled: true,
@@ -68,28 +70,42 @@ var Basify = (function(exports) {
 		static getArtist(id) {
 			return LocalStorageManager.loadData().artistsById[id] || null;
 		}
-		static async saveArtist(artist) {
+		static async saveArtist(artistOrArtists) {
 			const now = Date.now();
-			const savedArtist = {
+			const isArray = Array.isArray(artistOrArtists);
+			const savedArtists = (isArray ? artistOrArtists : [artistOrArtists]).map((artist) => ({
 				...artist,
 				updatedAt: now,
 				lastUsedAt: now
-			};
+			}));
 			await LocalStorageManager.updateData((data) => {
-				data.artistsById[artist.id] = savedArtist;
+				savedArtists.forEach((artist) => {
+					data.artistsById[artist.id] = artist;
+				});
 				LocalStorageManager.trimArtistCache(data);
 			});
-			return savedArtist;
+			return isArray ? savedArtists : savedArtists[0];
 		}
 		static trimArtistCache(data) {
 			const limit = data.settings.artistCacheLimit;
 			const artists = Object.values(data.artistsById);
 			if (artists.length <= limit) return;
-			artists.sort((a, b) => {
+			const protectedArtistIds = /* @__PURE__ */ new Set();
+			Object.values(data.tracksById || {}).forEach((track) => {
+				(track.artistIds || []).forEach((artistId) => protectedArtistIds.add(artistId));
+			});
+			const protectedArtists = [];
+			const evictableArtists = [];
+			artists.forEach((artist) => {
+				if (protectedArtistIds.has(artist.id)) protectedArtists.push(artist);
+				else evictableArtists.push(artist);
+			});
+			evictableArtists.sort((a, b) => {
 				const aTime = a.lastUsedAt || a.updatedAt || 0;
 				return (b.lastUsedAt || b.updatedAt || 0) - aTime;
 			});
-			const artistsToKeep = artists.slice(0, limit);
+			const remainingSlots = Math.max(0, limit - protectedArtists.length);
+			const artistsToKeep = [...protectedArtists, ...evictableArtists.slice(0, remainingSlots)];
 			data.artistsById = {};
 			artistsToKeep.forEach((artist) => {
 				data.artistsById[artist.id] = artist;
@@ -104,6 +120,59 @@ var Basify = (function(exports) {
 				updatedArtist = data.artistsById[id];
 			});
 			return updatedArtist;
+		}
+		static getTrack(id) {
+			return LocalStorageManager.loadData().tracksById[id] || null;
+		}
+		static async saveTrack(trackOrTracks) {
+			const now = Date.now();
+			const isArray = Array.isArray(trackOrTracks);
+			const savedTracks = (isArray ? trackOrTracks : [trackOrTracks]).map((track) => ({
+				...track,
+				updatedAt: now,
+				lastUsedAt: now
+			}));
+			await LocalStorageManager.updateData((data) => {
+				savedTracks.forEach((track) => {
+					data.tracksById[track.id] = track;
+				});
+			});
+			return isArray ? savedTracks : savedTracks[0];
+		}
+		static async markTrackUsed(id) {
+			const now = Date.now();
+			let updatedTrack = null;
+			await LocalStorageManager.updateData((data) => {
+				if (!data.tracksById[id]) return;
+				data.tracksById[id].lastUsedAt = now;
+				updatedTrack = data.tracksById[id];
+			});
+			return updatedTrack;
+		}
+		static getPlaylist(id) {
+			return LocalStorageManager.loadData().playlistsById[id] || null;
+		}
+		static async savePlaylist(playlist) {
+			const now = Date.now();
+			const savedPlaylist = {
+				...playlist,
+				updatedAt: now,
+				lastUsedAt: now
+			};
+			await LocalStorageManager.updateData((data) => {
+				data.playlistsById[playlist.id] = savedPlaylist;
+			});
+			return savedPlaylist;
+		}
+		static async markPlaylistUsed(id) {
+			const now = Date.now();
+			let updatedPlaylist = null;
+			await LocalStorageManager.updateData((data) => {
+				if (!data.playlistsById[id]) return;
+				data.playlistsById[id].lastUsedAt = now;
+				updatedPlaylist = data.playlistsById[id];
+			});
+			return updatedPlaylist;
 		}
 		static getSettings() {
 			return LocalStorageManager.loadData().settings;
@@ -1356,7 +1425,7 @@ var Basify = (function(exports) {
 			});
 			if (!missingArtists.length) return artistsById;
 			const fetchedArtistsData = await Artist.fetchMany(missingArtists);
-			(await Promise.all(fetchedArtistsData.map((artistData) => LocalStorageManager.saveArtist(artistData)))).forEach((artistData) => {
+			(await LocalStorageManager.saveArtist(fetchedArtistsData)).forEach((artistData) => {
 				artistsById[artistData.id] = new Artist(artistData);
 			});
 			return artistsById;
@@ -1572,19 +1641,87 @@ var Basify = (function(exports) {
 	//#endregion
 	//#region src/models/Track.js
 	var BasifyTrack = class BasifyTrack {
-		constructor(spotifyTrack, trackArtists, distributors = []) {
-			this.raw = spotifyTrack;
-			this.uri = spotifyTrack.uri;
-			this.id = spotifyTrack.uri?.split(":")?.[2] || null;
-			this.name = spotifyTrack.name || BasifyI18n.t("unknownTrack");
+		constructor(data, trackArtists = []) {
+			trackArtists = trackArtists || [];
+			this.id = data.id;
+			this.uri = data.uri;
+			this.name = data.name;
+			this.albumUri = data.albumUri || null;
+			this.imageUrl = data.imageUrl || null;
+			this.distributors = data.distributors || [];
+			this.artistIds = data.artistIds || trackArtists.map((artist) => artist.id);
 			this.artistsById = {};
 			trackArtists.forEach((artist) => {
 				this.artistsById[artist.id] = artist;
 			});
-			this.distributors = distributors;
+			this.updatedAt = data.updatedAt || Date.now();
+			this.lastUsedAt = data.lastUsedAt || Date.now();
 		}
 		get artists() {
 			return Object.values(this.artistsById);
+		}
+		static async create(spotifyTrack, trackArtists = []) {
+			const trackId = spotifyTrack.uri?.split(":")?.[2] || null;
+			const cachedTrackData = trackId ? LocalStorageManager.getTrack(trackId) : null;
+			if (cachedTrackData) {
+				console.log("Loading track from local storage", trackId);
+				return new BasifyTrack(await LocalStorageManager.markTrackUsed(trackId) || cachedTrackData, trackArtists);
+			}
+			const fetchedTrackData = await BasifyTrack.fetch(spotifyTrack, trackArtists);
+			return new BasifyTrack(await LocalStorageManager.saveTrack(fetchedTrackData), trackArtists);
+		}
+		static async getTrackArtists(spotifyTrack) {
+			const artistsData = spotifyTrack?.artists || [];
+			return Promise.all(artistsData.map((a) => Artist.create(a.uri.split(":")[2], a.name)));
+		}
+		static async createFromNowPlaying(spotifyTrack) {
+			try {
+				const [trackArtists, artistSpans] = await Promise.all([BasifyTrack.getTrackArtists(spotifyTrack), DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5e3).catch(() => null)]);
+				return {
+					basifyTrack: await BasifyTrack.create(spotifyTrack, trackArtists),
+					artistSpans
+				};
+			} catch (e) {
+				return null;
+			}
+		}
+		static async fetch(spotifyTrack, trackArtists = []) {
+			const distributors = await BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []);
+			console.log("Requesting track info from Spotify", spotifyTrack.uri.split(":")[2]);
+			return {
+				id: spotifyTrack.uri?.split(":")?.[2] || null,
+				uri: spotifyTrack.uri,
+				name: spotifyTrack.name || BasifyI18n.t("unknownTrack"),
+				albumUri: spotifyTrack.album?.uri || null,
+				imageUrl: BasifyTrack.getTrackImageUrl(spotifyTrack),
+				artistIds: trackArtists.map((artist) => artist.id),
+				distributors
+			};
+		}
+		static async createMany(items) {
+			const tracksById = {};
+			const missingItems = [];
+			items.forEach(({ track, trackArtists = [] }) => {
+				const id = track.uri?.split(":")?.[2];
+				if (!id) return;
+				const cachedTrackData = LocalStorageManager.getTrack(id);
+				if (cachedTrackData) {
+					tracksById[id] = new BasifyTrack(cachedTrackData, trackArtists);
+					LocalStorageManager.markTrackUsed(id).catch(() => {});
+					return;
+				}
+				missingItems.push({
+					track,
+					trackArtists
+				});
+			});
+			if (!missingItems.length) return tracksById;
+			const fetchedTracksData = await Promise.all(missingItems.map(({ track, trackArtists }) => BasifyTrack.fetch(track, trackArtists)));
+			(await LocalStorageManager.saveTrack(fetchedTracksData)).forEach((trackData, index) => {
+				const { trackArtists } = missingItems[index];
+				tracksById[trackData.id] = new BasifyTrack(trackData, trackArtists);
+			});
+			return tracksById;
 		}
 		static async getDistributorsFromSpotifyTrack(spotifyTrack) {
 			const albumUri = spotifyTrack?.album?.uri;
@@ -1667,9 +1804,8 @@ var Basify = (function(exports) {
 			].find((themeStatus) => labels.includes(themeStatus)) || null;
 		}
 		async getDominantColor() {
-			const imageUrl = BasifyTrack.getTrackImageUrl(this.raw);
-			if (!imageUrl) return null;
-			return BasifyTrack.extractDominantColorFromImage(imageUrl);
+			if (!this.imageUrl) return null;
+			return BasifyTrack.extractDominantColorFromImage(this.imageUrl);
 		}
 		static getTrackImageUrl(spotifyTrack) {
 			const imageUri = spotifyTrack?.images?.[0]?.url || spotifyTrack?.album?.images?.[0]?.url || spotifyTrack?.metadata?.image_xlarge_url || spotifyTrack?.metadata?.image_large_url || spotifyTrack?.metadata?.image_url;
@@ -1917,6 +2053,546 @@ var Basify = (function(exports) {
 		}
 	};
 	//#endregion
+	//#region src/models/Playlist.js
+	var Playlist = class Playlist {
+		constructor(data) {
+			this.id = data.id;
+			this.name = data.name || null;
+			this.rating = data.rating || null;
+			this.trackIds = data.trackIds || [];
+			this.updatedAt = data.updatedAt || Date.now();
+			this.lastUsedAt = data.lastUsedAt || Date.now();
+		}
+		static async create(playlistId, shouldContinue = () => true) {
+			const playlistUri = "spotify:playlist:" + playlistId;
+			const trackIds = await Playlist.fetchTrackIds(playlistUri, shouldContinue);
+			const cachedPlaylistData = LocalStorageManager.getPlaylist(playlistId);
+			const sameTrackIds = cachedPlaylistData && Playlist.sameTrackIds(trackIds, cachedPlaylistData.trackIds);
+			const allTracksCached = trackIds.every((id) => LocalStorageManager.getTrack(id));
+			if (sameTrackIds && allTracksCached) return new Playlist(await LocalStorageManager.markPlaylistUsed(playlistId) || cachedPlaylistData);
+			if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
+			const name = (await Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri).catch(() => null))?.name || null;
+			const fetchedPlaylistData = await Playlist.fetch(playlistId, name, shouldContinue);
+			return new Playlist(await LocalStorageManager.savePlaylist(fetchedPlaylistData));
+		}
+		static sameTrackIds(currentTrackIds, cachedTrackIds = []) {
+			if (currentTrackIds.length !== cachedTrackIds.length) return false;
+			return currentTrackIds.every((id, index) => id === cachedTrackIds[index]);
+		}
+		static async fetchPlaylistItems(playlistUri, shouldContinue = () => true) {
+			let allTracks = [];
+			let offset = 0;
+			const limit = 200;
+			let hasMore = true;
+			while (hasMore) {
+				if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
+				const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, {
+					offset,
+					limit
+				}).catch(() => null);
+				if (!contents?.items?.length) {
+					hasMore = false;
+					break;
+				}
+				allTracks = allTracks.concat(contents.items.map((item) => item.track || item));
+				offset += limit;
+				if (contents.items.length < limit) hasMore = false;
+			}
+			return allTracks.filter((track) => track?.uri);
+		}
+		static async fetchTrackIds(playlistUri, shouldContinue = () => true) {
+			return (await Playlist.fetchPlaylistItems(playlistUri, shouldContinue)).map((track) => track.uri.split(":")[2]);
+		}
+		static async fetch(playlistId, name, shouldContinue = () => true) {
+			const playlistUri = "spotify:playlist:" + playlistId;
+			const spotifyTracks = await Playlist.fetchPlaylistItems(playlistUri, shouldContinue);
+			if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
+			const uniqueArtistsById = {};
+			spotifyTracks.forEach((track) => {
+				(track.artists || []).forEach((artist) => {
+					const id = artist.uri?.split(":")?.[2];
+					if (id && !uniqueArtistsById[id]) uniqueArtistsById[id] = {
+						id,
+						name: artist.name || null
+					};
+				});
+			});
+			const artistsById = await Artist.createMany(Object.values(uniqueArtistsById));
+			const tracksById = await BasifyTrack.createMany(spotifyTracks.map((track) => ({
+				track,
+				trackArtists: (track.artists || []).map((artist) => artistsById[artist.uri?.split(":")?.[2]]).filter(Boolean)
+			})));
+			const trackIds = spotifyTracks.map((track) => track.uri.split(":")[2]);
+			let blockedCount = 0;
+			trackIds.forEach((trackId) => {
+				const basifyTrack = tracksById[trackId];
+				if (basifyTrack && basifyTrack.getSkipReasons().length > 0) blockedCount++;
+			});
+			const totalCount = trackIds.length;
+			return {
+				id: playlistId,
+				name,
+				trackIds,
+				rating: {
+					percentage: totalCount > 0 ? Math.round(blockedCount / totalCount * 100) : 0,
+					blockedCount,
+					totalCount
+				}
+			};
+		}
+	};
+	//#endregion
+	//#region src/ui/PlaylistView.js
+	var PlaylistViewRenderer = class PlaylistViewRenderer {
+		static styleElementId = "basify-playlist-view-style";
+		static observer = null;
+		static eventsRegistered = false;
+		static inFlightPlaylists = /* @__PURE__ */ new Map();
+		static currentPlaylist = null;
+		static start() {
+			PlaylistViewRenderer.injectStyles();
+			PlaylistViewRenderer.registerGlobalInterceptors();
+			if (PlaylistViewRenderer.observer) PlaylistViewRenderer.observer.disconnect();
+			PlaylistViewRenderer.observer = new MutationObserver(() => {
+				PlaylistViewRenderer.scanRows();
+			});
+			const mainView = document.querySelector(".main-view-container");
+			if (mainView) {
+				PlaylistViewRenderer.observer.observe(mainView, {
+					childList: true,
+					subtree: true
+				});
+				PlaylistViewRenderer.scanRows();
+			}
+		}
+		static stop() {
+			if (PlaylistViewRenderer.observer) {
+				PlaylistViewRenderer.observer.disconnect();
+				PlaylistViewRenderer.observer = null;
+			}
+			PlaylistViewRenderer.currentPlaylist = null;
+		}
+		static registerGlobalInterceptors() {
+			if (PlaylistViewRenderer.eventsRegistered) return;
+			PlaylistViewRenderer.eventsRegistered = true;
+			document.addEventListener("dblclick", (e) => {
+				if (!LocalStorageManager.getSettings().skipEnabled) return;
+				if (e.target.closest(".basify-blocked-row")) {
+					e.stopPropagation();
+					e.preventDefault();
+				}
+			}, true);
+			document.addEventListener("click", (e) => {
+				if (!LocalStorageManager.getSettings().skipEnabled) return;
+				if (!e.target.closest(".basify-blocked-row")) return;
+				const playButton = e.target.closest("button[aria-label*=\"Play\"], button[aria-label*=\"play\"]");
+				const indexCell = e.target.closest(".main-trackList-rowSectionIndex");
+				if (playButton || indexCell) {
+					e.stopPropagation();
+					e.preventDefault();
+				}
+			}, true);
+		}
+		static isPlaylistPageActive(playlistId) {
+			const pathParts = Spicetify.Platform.History.location.pathname.split("/");
+			return pathParts[1] === "playlist" && pathParts[2] === playlistId;
+		}
+		static apply(headerElement, playlistId) {
+			const settings = LocalStorageManager.getSettings();
+			document.getElementById("basify-playlist-rating-card")?.remove();
+			document.getElementById("basify-playlist-rating-skeleton")?.remove();
+			if (!settings.showPlaylistRating) return;
+			PlaylistViewRenderer.injectStyles();
+			PlaylistViewRenderer.renderSkeleton(headerElement);
+			let loadPromise = PlaylistViewRenderer.inFlightPlaylists.get(playlistId);
+			if (!loadPromise) {
+				loadPromise = Playlist.create(playlistId, () => PlaylistViewRenderer.isPlaylistPageActive(playlistId)).finally(() => PlaylistViewRenderer.inFlightPlaylists.delete(playlistId));
+				PlaylistViewRenderer.inFlightPlaylists.set(playlistId, loadPromise);
+			}
+			loadPromise.then((playlist) => {
+				if (!PlaylistViewRenderer.isPlaylistPageActive(playlistId)) return;
+				PlaylistViewRenderer.currentPlaylist = playlist;
+				document.getElementById("basify-playlist-rating-skeleton")?.remove();
+				PlaylistViewRenderer.renderRatingCard(headerElement, playlist);
+				document.querySelectorAll("[data-basify-processed]").forEach((el) => el.removeAttribute("data-basify-processed"));
+			}).catch(() => {
+				document.getElementById("basify-playlist-rating-skeleton")?.remove();
+			});
+		}
+		static renderSkeleton(headerElement) {
+			const skeleton = document.createElement("div");
+			skeleton.id = "basify-playlist-rating-skeleton";
+			skeleton.className = "basify-playlist-rating-skeleton";
+			skeleton.innerHTML = `
+      <div class="basify-skeleton-gauge"></div>
+      <div class="basify-skeleton-text">
+        <div class="basify-skeleton-line" style="width: 120px;"></div>
+        <div class="basify-skeleton-line" style="width: 180px;"></div>
+      </div>
+    `;
+			headerElement.appendChild(skeleton);
+			return skeleton;
+		}
+		static animateCounter(element, targetValue, durationMs = 800) {
+			const startTime = performance.now();
+			const startValue = 0;
+			function update(currentTime) {
+				const elapsedTime = currentTime - startTime;
+				if (elapsedTime >= durationMs) {
+					element.textContent = `${targetValue}%`;
+					return;
+				}
+				const progress = elapsedTime / durationMs;
+				const easeProgress = progress * (2 - progress);
+				element.textContent = `${Math.round(startValue + easeProgress * (targetValue - startValue))}%`;
+				requestAnimationFrame(update);
+			}
+			requestAnimationFrame(update);
+		}
+		static renderRatingCard(headerElement, playlist) {
+			const rating = playlist.rating;
+			if (!rating) return;
+			document.getElementById("basify-playlist-rating-card")?.remove();
+			const card = document.createElement("div");
+			card.id = "basify-playlist-rating-card";
+			card.className = "basify-playlist-rating-card";
+			const dashArray = 126;
+			const dashOffset = dashArray - rating.percentage / 100 * dashArray;
+			let strokeColor = "#1ed760";
+			if (rating.percentage > 9) strokeColor = "#f5c542";
+			if (rating.percentage > 29) strokeColor = "#ff4d4d";
+			const locale = LocalStorageManager.getSettings().locale;
+			const ratingText = locale === "uk" ? "Рейтинг безпеки" : "Safety Rating";
+			const subText = locale === "uk" ? `${rating.blockedCount} з ${rating.totalCount} треків заблоковано` : `${rating.blockedCount} of ${rating.totalCount} tracks blocked`;
+			card.innerHTML = `
+      <div class="basify-gauge-wrapper">
+        <svg viewBox="0 0 100 55" width="100" height="55">
+          <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10" stroke-linecap="round" />
+          <path class="basify-gauge-fill" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="${strokeColor}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${dashArray}" stroke-dashoffset="${dashArray}" />
+        </svg>
+        <div class="basify-gauge-percentage">0%</div>
+      </div>
+      <div class="basify-rating-text-container">
+        <div class="basify-rating-title">${ratingText}</div>
+        <div class="basify-rating-subtext">${subText}</div>
+      </div>
+    `;
+			headerElement.appendChild(card);
+			requestAnimationFrame(() => {
+				const fillPath = card.querySelector(".basify-gauge-fill");
+				const percentageText = card.querySelector(".basify-gauge-percentage");
+				if (fillPath && percentageText) {
+					fillPath.style.strokeDashoffset = String(dashOffset);
+					PlaylistViewRenderer.animateCounter(percentageText, rating.percentage, 800);
+				}
+			});
+		}
+		static async scanRows() {
+			const rows = document.querySelectorAll("div[role=\"row\"]");
+			const settings = LocalStorageManager.getSettings();
+			const candidates = [];
+			const uniqueArtistsById = {};
+			rows.forEach((row) => {
+				const artistLinks = row.querySelectorAll("a[href^=\"/artist/\"]");
+				if (!artistLinks.length) return;
+				const artistIds = Array.from(artistLinks).map((link) => link.pathname.split("/")[2]);
+				const artistIdsString = artistIds.join(",");
+				if (row.dataset.basifyProcessed === artistIdsString) return;
+				row.dataset.basifyProcessed = artistIdsString;
+				row.classList.remove("basify-blocked-row");
+				row.querySelectorAll(".basify-playlist-status-icon-wrapper").forEach((el) => {
+					el.removeEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
+					el.removeEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
+					el.remove();
+				});
+				artistLinks.forEach((link) => {
+					link.classList.remove("basify-now-playing-artist-name");
+					link.style.removeProperty("--basify-artist-status-color");
+				});
+				artistIds.forEach((id) => {
+					if (!uniqueArtistsById[id]) uniqueArtistsById[id] = {
+						id,
+						name: null
+					};
+				});
+				candidates.push({
+					row,
+					artistLinks,
+					artistIds
+				});
+			});
+			if (!candidates.length) return;
+			let artistsById;
+			try {
+				artistsById = await Artist.createMany(Object.values(uniqueArtistsById));
+			} catch (e) {
+				candidates.forEach(({ row }) => row.removeAttribute("data-basify-processed"));
+				return;
+			}
+			const playlist = PlaylistViewRenderer.currentPlaylist;
+			const pathParts = Spicetify.Platform.History.location.pathname.split("/");
+			const trackIds = pathParts[1] === "playlist" && playlist?.id === pathParts[2] ? playlist.trackIds : null;
+			candidates.forEach(({ row, artistLinks, artistIds }) => {
+				let shouldSkipRow = false;
+				artistIds.forEach((id, index) => {
+					const artist = artistsById[id];
+					const link = artistLinks[index];
+					if (!link || !artist) return;
+					const labels = artist.labels.length ? artist.labels : ["noInfo"];
+					const dominantLabel = [
+						"blocked",
+						"warning",
+						"unknown",
+						"pride",
+						"base",
+						"approved",
+						"noInfo"
+					].find((l) => labels.includes(l)) || "noInfo";
+					const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
+					if (settings.formatNowPlayingArtistName && statusStyle?.color) {
+						link.classList.add("basify-now-playing-artist-name");
+						link.style.setProperty("--basify-artist-status-color", statusStyle.color);
+					}
+					if (dominantLabel === "blocked" || dominantLabel === "warning" || dominantLabel === "unknown") {
+						const wrapper = document.createElement("span");
+						wrapper.className = "basify-playlist-status-icon-wrapper";
+						const iconSpan = document.createElement("span");
+						iconSpan.className = "basify-playlist-status-icon";
+						iconSpan.style.color = statusStyle.color;
+						const badgeConfig = ArtistInfoSectionRenderer.badges[dominantLabel] || ArtistInfoSectionRenderer.badges.noInfo;
+						const labelText = BasifyI18n.t(badgeConfig.textKey);
+						const description = LocalStorageManager.getSettings().locale === "uk" ? artist.description : artist.descriptionEn;
+						let tooltipText = `${labelText} (${artist.name})`;
+						if (description) tooltipText += ` - ${description}`;
+						wrapper.dataset.tooltipText = tooltipText;
+						let iconSvg = unknownSvg;
+						if (dominantLabel === "blocked") iconSvg = banSvg;
+						else if (dominantLabel === "warning") iconSvg = warningSvg;
+						iconSpan.innerHTML = iconSvg;
+						const svgElement = iconSpan.querySelector("svg");
+						if (svgElement) {
+							svgElement.setAttribute("width", "12");
+							svgElement.setAttribute("height", "12");
+							svgElement.style.marginLeft = "0";
+						}
+						wrapper.appendChild(iconSpan);
+						wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
+						wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
+						link.parentNode.insertBefore(wrapper, link.nextSibling);
+					}
+					if (dominantLabel === "blocked") shouldSkipRow = true;
+				});
+				let trackBlocked = false;
+				if (trackIds) {
+					const trackIndex = Number(row.getAttribute("aria-rowindex")) - 2;
+					const trackId = trackIndex >= 0 ? trackIds[trackIndex] : null;
+					const trackData = trackId ? LocalStorageManager.getTrack(trackId) : null;
+					if (trackData) {
+						const blockedDistributors = new BasifyTrack(trackData).getBlockedDistributors();
+						if (blockedDistributors.length > 0) {
+							trackBlocked = true;
+							const lastLink = artistLinks[artistLinks.length - 1];
+							if (lastLink) {
+								const wrapper = document.createElement("span");
+								wrapper.className = "basify-playlist-status-icon-wrapper";
+								const iconSpan = document.createElement("span");
+								iconSpan.className = "basify-playlist-status-icon";
+								iconSpan.style.color = NowPlayingArtistRenderer.statusStyles["blocked"].color;
+								iconSpan.innerHTML = banSvg;
+								const svgEl = iconSpan.querySelector("svg");
+								if (svgEl) {
+									svgEl.setAttribute("width", "12");
+									svgEl.setAttribute("height", "12");
+									svgEl.style.marginLeft = "0";
+								}
+								const labelText = LocalStorageManager.getSettings().locale === "uk" ? "Заблокований дистриб'ютор" : "Blocked distributor";
+								wrapper.dataset.tooltipText = `${labelText}: ${blockedDistributors.join(", ")}`;
+								wrapper.appendChild(iconSpan);
+								wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
+								wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
+								lastLink.parentNode.insertBefore(wrapper, lastLink.nextSibling);
+							}
+						}
+					}
+				}
+				if ((shouldSkipRow || trackBlocked) && settings.skipEnabled) row.classList.add("basify-blocked-row");
+			});
+		}
+		static showTooltip(event) {
+			const wrapper = event.currentTarget;
+			const text = wrapper.dataset.tooltipText;
+			if (!text) return;
+			let tooltip = document.getElementById("basify-global-tooltip");
+			if (!tooltip) {
+				tooltip = document.createElement("div");
+				tooltip.id = "basify-global-tooltip";
+				tooltip.className = "basify-global-tooltip";
+				document.body.appendChild(tooltip);
+			}
+			tooltip.textContent = text;
+			const rect = wrapper.getBoundingClientRect();
+			tooltip.style.left = `${rect.left + rect.width / 2}px`;
+			tooltip.style.top = `${rect.top - 6}px`;
+			tooltip.classList.add("is-visible");
+		}
+		static hideTooltip() {
+			const tooltip = document.getElementById("basify-global-tooltip");
+			if (tooltip) tooltip.classList.remove("is-visible");
+		}
+		static injectStyles() {
+			if (document.getElementById(PlaylistViewRenderer.styleElementId)) return;
+			const style = document.createElement("style");
+			style.id = PlaylistViewRenderer.styleElementId;
+			style.textContent = `
+      .basify-blocked-row {
+        opacity: 0.35;
+        background: rgba(114, 52, 51, 0.05) !important;
+        transition: opacity 0.2s ease;
+      }
+      .basify-blocked-row:hover {
+        opacity: 0.75;
+      }
+      .basify-playlist-status-icon-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        vertical-align: middle;
+        margin-left: 4px;
+      }
+      .basify-playlist-status-icon svg {
+        display: block;
+      }
+      .basify-global-tooltip {
+        position: fixed;
+        transform: translate(-50%, -100%) scale(0.95);
+        background: #282828;
+        color: #ffffff;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        max-width: 320px;
+        white-space: normal;
+        line-height: 1.4;
+        text-align: center;
+        word-wrap: break-word;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        z-index: 999999 !important;
+        pointer-events: none;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition: opacity 0.1s cubic-bezier(0.4, 0, 0.2, 1), transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .basify-global-tooltip.is-visible {
+        opacity: 1;
+        transform: translate(-50%, -100%) scale(1);
+      }
+      .basify-playlist-rating-card {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 16px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        width: fit-content;
+      }
+      .basify-gauge-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100px;
+        height: 55px;
+      }
+      .basify-gauge-fill {
+        transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .basify-gauge-percentage {
+        position: absolute;
+        bottom: 2px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 15px;
+        font-weight: 800;
+        color: #ffffff;
+      }
+      .basify-rating-text-container {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .basify-rating-title {
+        font-size: 12px;
+        font-weight: 800;
+        color: #ffffff;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .basify-playlist-rating-card .basify-rating-title {
+        color: #ffffff !important;
+      }
+      .basify-rating-subtext {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--spice-subtext);
+      }
+      .basify-playlist-rating-skeleton {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 16px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        width: fit-content;
+      }
+      .basify-skeleton-gauge {
+        width: 100px;
+        height: 55px;
+        border-radius: 8px;
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.06) 25%,
+          rgba(255, 255, 255, 0.12) 50%,
+          rgba(255, 255, 255, 0.06) 75%
+        );
+        background-size: 200% 100%;
+        animation: basify-skeleton-shimmer 1.4s ease infinite;
+      }
+      .basify-skeleton-text {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .basify-skeleton-line {
+        height: 12px;
+        border-radius: 4px;
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.06) 25%,
+          rgba(255, 255, 255, 0.12) 50%,
+          rgba(255, 255, 255, 0.06) 75%
+        );
+        background-size: 200% 100%;
+        animation: basify-skeleton-shimmer 1.4s ease infinite;
+      }
+      @keyframes basify-skeleton-shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+    `;
+			document.head.appendChild(style);
+		}
+	};
+	//#endregion
 	//#region src/index.js
 	async function loadArtistPage(location = Spicetify.Platform.History.location) {
 		const pathParts = location.pathname.split("/");
@@ -1935,19 +2611,28 @@ var Basify = (function(exports) {
 		if (location.pathname.split("/")[1] !== "artist") return;
 		await loadArtistPage(location);
 	}
-	async function getTrackArtists(track) {
-		const artistsData = track?.artists || [];
-		return Promise.all(artistsData.map((a) => {
-			const id = a.uri.split(":")[2];
-			return Artist.create(id, a.name);
-		}));
+	async function loadPlaylistPage(location = Spicetify.Platform.History.location) {
+		const pathParts = location.pathname.split("/");
+		if (pathParts[1] !== "playlist" || !pathParts[2]) {
+			PlaylistViewRenderer.stop();
+			return;
+		}
+		PlaylistViewRenderer.start();
+		console.log("loadPlaylistPage()");
+		const playlistId = pathParts[2];
+		const targetPathname = location.pathname;
+		try {
+			const headerElement = await DomObserver.waitForElement(".main-entityHeader-headerText", 5e3);
+			if (Spicetify.Platform.History.location.pathname !== targetPathname) return;
+			if (headerElement) PlaylistViewRenderer.apply(headerElement, playlistId);
+		} catch (error) {}
 	}
 	async function songChangeHandler(timeoutMs = 7500) {
 		NowPlayingThemeOverlayRenderer.clear();
 		try {
 			const spotifyTrack = await waitForCurrentSpotifyTrack(timeoutMs);
 			if (!spotifyTrack) return;
-			const context = await buildNowPlayingTrackContext(spotifyTrack);
+			const context = await BasifyTrack.createFromNowPlaying(spotifyTrack);
 			if (!context || !isStillCurrentTrack(spotifyTrack.uri)) return;
 			const { basifyTrack, artistSpans } = context;
 			NowPlayingRuntimeState.update(basifyTrack, artistSpans);
@@ -1960,21 +2645,6 @@ var Basify = (function(exports) {
 			const track = Spicetify.Player.data?.item;
 			return track?.uri && track?.artists?.length ? track : null;
 		}, timeoutMs).catch(() => null);
-	}
-	async function buildNowPlayingTrackContext(spotifyTrack) {
-		try {
-			const [trackArtists, artistSpans, distributors] = await Promise.all([
-				getTrackArtists(spotifyTrack),
-				DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5e3).catch(() => null),
-				BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => [])
-			]);
-			return {
-				basifyTrack: new BasifyTrack(spotifyTrack, trackArtists, distributors),
-				artistSpans
-			};
-		} catch (e) {
-			return null;
-		}
 	}
 	function isStillCurrentTrack(trackUri) {
 		return Spicetify.Player.data?.item?.uri === trackUri;
@@ -2002,6 +2672,7 @@ var Basify = (function(exports) {
 		SettingsMenu.registerButton();
 		PlaybackDeviceMonitor.start();
 		loadArtistPage().catch(() => {});
+		loadPlaylistPage().catch(() => {});
 		songChangeHandler().catch(() => {});
 	}
 	function main() {
@@ -2014,53 +2685,8 @@ var Basify = (function(exports) {
 		});
 		Spicetify.Platform.History.listen(async (location) => {
 			console.log(location);
-			if (location.pathname.split("/")[1] === "playlist") {
-				const startTime = performance.now();
-				const playlistUri = "spotify:playlist:" + location.pathname.split("/")[2];
-				let allTracks = [];
-				let offset = 0;
-				const limit = 200;
-				let hasMore = true;
-				console.log(`[Basify] Requesting metadata for playlist: ${location.pathname.split("/")[2]}`);
-				while (hasMore) {
-					const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, {
-						offset,
-						limit
-					}).catch(() => null);
-					if (!contents || !contents.items || contents.items.length === 0) {
-						hasMore = false;
-						break;
-					}
-					allTracks.push(...await Promise.all(contents.items.map(async (track) => ({
-						...track,
-						distributors: await BasifyTrack.getDistributorsFromSpotifyTrack(track)
-					}))));
-					offset += limit;
-					if (contents.items.length < limit) hasMore = false;
-				}
-				const distributorsLoadingTime = performance.now();
-				console.log(`[Basify] All playlist tracks with distributors:`, allTracks, ` took `, (distributorsLoadingTime - startTime).toFixed(2), `ms`);
-				const uniqueArtistIds = {};
-				allTracks.forEach((track) => {
-					(track.artists || []).forEach((artist) => {
-						const id = artist.uri?.split(":")?.[2];
-						if (!id) return;
-						if (!uniqueArtistIds[id]) uniqueArtistIds[id] = {
-							id,
-							name: artist.name || null
-						};
-					});
-				});
-				const artistsData = Object.values(uniqueArtistIds);
-				const uniqueArtistIdsLoadingTime = performance.now();
-				console.log(`[Basify] All unique artist Ids:`, artistsData, ` took `, (uniqueArtistIdsLoadingTime - distributorsLoadingTime).toFixed(2), `ms`);
-				const artists = await Artist.createMany(artistsData);
-				const loadingAllArtistsTime = performance.now();
-				console.log(`[Basify] All unique artist info:`, artists, ` took `, (loadingAllArtistsTime - uniqueArtistIdsLoadingTime).toFixed(2), `ms`);
-				const endTime = performance.now();
-				console.log(`[Basify] Total playlist loading time`, (endTime - startTime).toFixed(2), `ms`);
-			}
 			loadArtistPage(location).catch(() => {});
+			loadPlaylistPage(location).catch(() => {});
 		});
 	}
 	(function init() {
@@ -2071,10 +2697,9 @@ var Basify = (function(exports) {
 		main();
 	})();
 	//#endregion
-	exports.buildNowPlayingTrackContext = buildNowPlayingTrackContext;
-	exports.getTrackArtists = getTrackArtists;
 	exports.isStillCurrentTrack = isStillCurrentTrack;
 	exports.loadArtistPage = loadArtistPage;
+	exports.loadPlaylistPage = loadPlaylistPage;
 	exports.playPauseHandler = playPauseHandler;
 	exports.refreshCurrentArtistPage = refreshCurrentArtistPage;
 	exports.renderNowPlayingTrack = renderNowPlayingTrack;

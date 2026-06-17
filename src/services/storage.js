@@ -14,6 +14,8 @@ export class LocalStorageManager {
   static createDefaultData() {
     return {
       artistsById: {},
+      tracksById: {},
+      playlistsById: {},
       settings: {
         locale: BasifyI18n.getInitialLocale(),
         skipEnabled: true,
@@ -82,30 +84,52 @@ export class LocalStorageManager {
     return data.artistsById[id] || null;
   }
 
-  static async saveArtist(artist) {
+  static async saveArtist(artistOrArtists) {
     const now = Date.now();
-    const savedArtist = {
+    const isArray = Array.isArray(artistOrArtists);
+    const savedArtists = (isArray ? artistOrArtists : [artistOrArtists]).map((artist) => ({
       ...artist,
       updatedAt: now,
       lastUsedAt: now,
-    };
+    }));
     await LocalStorageManager.updateData((data) => {
-      data.artistsById[artist.id] = savedArtist;
+      savedArtists.forEach((artist) => {
+        data.artistsById[artist.id] = artist;
+      });
       LocalStorageManager.trimArtistCache(data);
     });
-    return savedArtist;
+    return isArray ? savedArtists : savedArtists[0];
   }
 
   static trimArtistCache(data) {
     const limit = data.settings.artistCacheLimit;
     const artists = Object.values(data.artistsById);
     if (artists.length <= limit) return;
-    artists.sort((a, b) => {
+
+    const protectedArtistIds = new Set();
+    Object.values(data.tracksById || {}).forEach((track) => {
+      (track.artistIds || []).forEach((artistId) => protectedArtistIds.add(artistId));
+    });
+
+    const protectedArtists = [];
+    const evictableArtists = [];
+    artists.forEach((artist) => {
+      if (protectedArtistIds.has(artist.id)) {
+        protectedArtists.push(artist);
+      } else {
+        evictableArtists.push(artist);
+      }
+    });
+
+    evictableArtists.sort((a, b) => {
       const aTime = a.lastUsedAt || a.updatedAt || 0;
       const bTime = b.lastUsedAt || b.updatedAt || 0;
       return bTime - aTime;
     });
-    const artistsToKeep = artists.slice(0, limit);
+
+    const remainingSlots = Math.max(0, limit - protectedArtists.length);
+    const artistsToKeep = [...protectedArtists, ...evictableArtists.slice(0, remainingSlots)];
+
     data.artistsById = {};
     artistsToKeep.forEach((artist) => {
       data.artistsById[artist.id] = artist;
@@ -121,6 +145,67 @@ export class LocalStorageManager {
       updatedArtist = data.artistsById[id];
     });
     return updatedArtist;
+  }
+
+  static getTrack(id) {
+    const data = LocalStorageManager.loadData();
+    return data.tracksById[id] || null;
+  }
+
+  static async saveTrack(trackOrTracks) {
+    const now = Date.now();
+    const isArray = Array.isArray(trackOrTracks);
+    const savedTracks = (isArray ? trackOrTracks : [trackOrTracks]).map((track) => ({
+      ...track,
+      updatedAt: now,
+      lastUsedAt: now,
+    }));
+    await LocalStorageManager.updateData((data) => {
+      savedTracks.forEach((track) => {
+        data.tracksById[track.id] = track;
+      });
+    });
+    return isArray ? savedTracks : savedTracks[0];
+  }
+
+  static async markTrackUsed(id) {
+    const now = Date.now();
+    let updatedTrack = null;
+    await LocalStorageManager.updateData((data) => {
+      if (!data.tracksById[id]) return;
+      data.tracksById[id].lastUsedAt = now;
+      updatedTrack = data.tracksById[id];
+    });
+    return updatedTrack;
+  }
+
+  static getPlaylist(id) {
+    const data = LocalStorageManager.loadData();
+    return data.playlistsById[id] || null;
+  }
+
+  static async savePlaylist(playlist) {
+    const now = Date.now();
+    const savedPlaylist = {
+      ...playlist,
+      updatedAt: now,
+      lastUsedAt: now,
+    };
+    await LocalStorageManager.updateData((data) => {
+      data.playlistsById[playlist.id] = savedPlaylist;
+    });
+    return savedPlaylist;
+  }
+
+  static async markPlaylistUsed(id) {
+    const now = Date.now();
+    let updatedPlaylist = null;
+    await LocalStorageManager.updateData((data) => {
+      if (!data.playlistsById[id]) return;
+      data.playlistsById[id].lastUsedAt = now;
+      updatedPlaylist = data.playlistsById[id];
+    });
+    return updatedPlaylist;
   }
 
   static getSettings() {

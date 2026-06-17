@@ -91,9 +91,7 @@ export class Artist {
 
     const fetchedArtistsData = await Artist.fetchMany(missingArtists);
 
-    const savedArtistsData = await Promise.all(
-      fetchedArtistsData.map((artistData) => LocalStorageManager.saveArtist(artistData)),
-    );
+    const savedArtistsData = await LocalStorageManager.saveArtist(fetchedArtistsData);
 
     savedArtistsData.forEach((artistData) => {
       artistsById[artistData.id] = new Artist(artistData);

@@ -8,8 +8,7 @@ import { NowPlayingThemeOverlayRenderer } from "./ui/ThemeOverlay.js";
 import { NowPlayingArtistRenderer } from "./ui/NowPlayingArtist.js";
 import { ArtistPageHeaderRenderer } from "./ui/ArtistHeader.js";
 import { SkipToastRenderer } from "./ui/SkipToast.js";
-import { LocalStorageManager } from "./services/storage.js";
-// import { PlaylistViewRenderer } from "./ui/PlaylistView.js";
+import { PlaylistViewRenderer } from "./ui/PlaylistView.js";
 
 export async function loadArtistPage(location = Spicetify.Platform.History.location) {
   const pathParts = location.pathname.split("/");
@@ -34,14 +33,23 @@ export async function refreshCurrentArtistPage() {
   await loadArtistPage(location);
 }
 
-export async function getTrackArtists(track) {
-  const artistsData = track?.artists || [];
-  return Promise.all(
-    artistsData.map((a) => {
-      const id = a.uri.split(":")[2];
-      return Artist.create(id, a.name);
-    }),
-  );
+export async function loadPlaylistPage(location = Spicetify.Platform.History.location) {
+  const pathParts = location.pathname.split("/");
+  if (pathParts[1] !== "playlist" || !pathParts[2]) {
+    PlaylistViewRenderer.stop();
+    return;
+  }
+  PlaylistViewRenderer.start();
+  console.log("loadPlaylistPage()");
+  const playlistId = pathParts[2];
+  const targetPathname = location.pathname;
+  try {
+    const headerElement = await DomObserver.waitForElement(".main-entityHeader-headerText", 5000);
+    if (Spicetify.Platform.History.location.pathname !== targetPathname) return;
+    if (headerElement) {
+      PlaylistViewRenderer.apply(headerElement, playlistId);
+    }
+  } catch (error) {}
 }
 
 export async function songChangeHandler(timeoutMs = 7500) {
@@ -49,7 +57,7 @@ export async function songChangeHandler(timeoutMs = 7500) {
   try {
     const spotifyTrack = await waitForCurrentSpotifyTrack(timeoutMs);
     if (!spotifyTrack) return;
-    const context = await buildNowPlayingTrackContext(spotifyTrack);
+    const context = await BasifyTrack.createFromNowPlaying(spotifyTrack);
     if (!context || !isStillCurrentTrack(spotifyTrack.uri)) return;
     const { basifyTrack, artistSpans } = context;
     NowPlayingRuntimeState.update(basifyTrack, artistSpans);
@@ -63,22 +71,6 @@ export async function waitForCurrentSpotifyTrack(timeoutMs = 10000) {
     const track = Spicetify.Player.data?.item;
     return track?.uri && track?.artists?.length ? track : null;
   }, timeoutMs).catch(() => null);
-}
-
-export async function buildNowPlayingTrackContext(spotifyTrack) {
-  try {
-    const [trackArtists, artistSpans, distributors] = await Promise.all([
-      getTrackArtists(spotifyTrack),
-      DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5000).catch(() => null),
-      BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []),
-    ]);
-    return {
-      basifyTrack: new BasifyTrack(spotifyTrack, trackArtists, distributors),
-      artistSpans,
-    };
-  } catch (e) {
-    return null;
-  }
 }
 
 export function isStillCurrentTrack(trackUri) {
@@ -113,14 +105,8 @@ export function renderNowPlayingTrack(basifyTrack, artistSpans) {
 async function startup() {
   SettingsMenu.registerButton();
   PlaybackDeviceMonitor.start();
-  // PlaylistViewRenderer.start();
   loadArtistPage().catch(() => {});
-
-  // const pathParts = Spicetify.Platform.History.location.pathname.split("/");
-  // if (pathParts[1] === "playlist" && pathParts[2]) {
-  //   PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
-  // }
-
+  loadPlaylistPage().catch(() => {});
   songChangeHandler().catch(() => {});
 }
 
@@ -134,105 +120,9 @@ function main() {
   });
   Spicetify.Platform.History.listen(async (location) => {
     console.log(location);
-    if (location.pathname.split("/")[1] === "playlist") {
-      const startTime = performance.now();
-
-      const playlistUri = "spotify:playlist:" + location.pathname.split("/")[2];
-      let allTracks = [];
-      let offset = 0;
-      const limit = 200;
-      let hasMore = true;
-
-      console.log(`[Basify] Requesting metadata for playlist: ${location.pathname.split("/")[2]}`);
-
-      while (hasMore) {
-        const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, { offset, limit }).catch(
-          () => null,
-        );
-        if (!contents || !contents.items || contents.items.length === 0) {
-          hasMore = false;
-          break;
-        }
-
-        allTracks.push(
-          ...(await Promise.all(
-            contents.items.map(async (track) => ({
-              ...track,
-              distributors: await BasifyTrack.getDistributorsFromSpotifyTrack(track),
-            })),
-          )),
-        );
-
-        offset += limit;
-
-        if (contents.items.length < limit) {
-          hasMore = false;
-        }
-      }
-
-      const distributorsLoadingTime = performance.now();
-      console.log(
-        `[Basify] All playlist tracks with distributors:`,
-        allTracks,
-        ` took `,
-        (distributorsLoadingTime - startTime).toFixed(2),
-        `ms`,
-      );
-
-      const uniqueArtistIds = {};
-
-      allTracks.forEach((track) => {
-        (track.artists || []).forEach((artist) => {
-          const id = artist.uri?.split(":")?.[2];
-          if (!id) return;
-
-          if (!uniqueArtistIds[id]) {
-            uniqueArtistIds[id] = {
-              id,
-              name: artist.name || null,
-            };
-          }
-        });
-      });
-
-      const artistsData = Object.values(uniqueArtistIds);
-
-      const uniqueArtistIdsLoadingTime = performance.now();
-      console.log(
-        `[Basify] All unique artist Ids:`,
-        artistsData,
-        ` took `,
-        (uniqueArtistIdsLoadingTime - distributorsLoadingTime).toFixed(2),
-        `ms`,
-      );
-
-      const artists = await Artist.createMany(artistsData);
-
-      const loadingAllArtistsTime = performance.now();
-      console.log(
-        `[Basify] All unique artist info:`,
-        artists,
-        ` took `,
-        (loadingAllArtistsTime - uniqueArtistIdsLoadingTime).toFixed(2),
-        `ms`,
-      );
-
-      const endTime = performance.now();
-      console.log(`[Basify] Total playlist loading time`, (endTime - startTime).toFixed(2), `ms`);
-    }
 
     loadArtistPage(location).catch(() => {});
-
-    // const pathParts = location.pathname.split("/");
-    // if (pathParts[1] === "playlist" && pathParts[2]) {
-    //   setTimeout(() => {
-    //     PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
-    //   }, 600);
-    // }
-
-    // setTimeout(() => {
-    //   PlaylistViewRenderer.start();
-    // }, 400);
+    loadPlaylistPage(location).catch(() => {});
   });
 }
 
