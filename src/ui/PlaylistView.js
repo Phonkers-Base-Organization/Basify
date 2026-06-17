@@ -98,6 +98,16 @@ export class PlaylistViewRenderer {
     if (!settings.showPlaylistRating) return;
 
     PlaylistViewRenderer.injectStyles();
+
+    const headerContainer = headerElement.closest(".main-entityHeader-container");
+    if (headerContainer && !headerContainer.classList.contains("basify-playlist-header-container")) {
+      const originalHeight = getComputedStyle(headerContainer).height;
+      headerContainer.style.setProperty("--basify-original-header-height", originalHeight);
+      headerContainer.classList.add("basify-playlist-header-container");
+      const imgElement = headerContainer.querySelector(".main-entityHeader-imageContainer");
+      if (imgElement) imgElement.style.setProperty("align-self", "center", "important");
+    }
+
     PlaylistViewRenderer.renderSkeleton(headerElement);
 
     let loadPromise = PlaylistViewRenderer.inFlightPlaylists.get(playlistId);
@@ -627,6 +637,7 @@ export class PlaylistViewRenderer {
           background-position: -200% 0;
         }
       }
+      .main-entityHeader-container.basify-playlist-header-container { height: auto !important; min-height: var(--basify-original-header-height) !important; overflow: visible !important; padding-top: 24px !important; box-sizing: border-box !important; }
     `;
     document.head.appendChild(style);
   }
