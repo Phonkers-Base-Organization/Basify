@@ -5,7 +5,6 @@ import { LocalStorageManager } from "../services/storage.js";
 import { NowPlayingArtistRenderer } from "./NowPlayingArtist.js";
 import { ArtistInfoSectionRenderer } from "./ArtistInfo.js";
 import { BasifyI18n } from "../locales/index.js";
-import { banSvg, warningSvg, unknownSvg } from "../constants/icons.js";
 
 export class PlaylistViewRenderer {
   static styleElementId = "basify-playlist-view-style";
@@ -16,6 +15,7 @@ export class PlaylistViewRenderer {
 
   static start() {
     PlaylistViewRenderer.injectStyles();
+    NowPlayingArtistRenderer.injectStyles();
     PlaylistViewRenderer.registerGlobalInterceptors();
 
     if (PlaylistViewRenderer.observer) {
@@ -58,6 +58,7 @@ export class PlaylistViewRenderer {
         if (row) {
           e.stopPropagation();
           e.preventDefault();
+          PlaylistViewRenderer.showBlockedPopup(row);
         }
       },
       true,
@@ -78,6 +79,7 @@ export class PlaylistViewRenderer {
         if (playButton || indexCell) {
           e.stopPropagation();
           e.preventDefault();
+          PlaylistViewRenderer.showBlockedPopup(row);
         }
       },
       true,
@@ -112,9 +114,7 @@ export class PlaylistViewRenderer {
         PlaylistViewRenderer.currentPlaylist = playlist;
         document.getElementById("basify-playlist-rating-skeleton")?.remove();
         PlaylistViewRenderer.renderRatingCard(headerElement, playlist);
-        document
-          .querySelectorAll("[data-basify-processed]")
-          .forEach((el) => el.removeAttribute("data-basify-processed"));
+        PlaylistViewRenderer.rescanRows();
       })
       .catch(() => {
         document.getElementById("basify-playlist-rating-skeleton")?.remove();
@@ -158,9 +158,27 @@ export class PlaylistViewRenderer {
     requestAnimationFrame(update);
   }
 
+  static computeRatingDisplay(rating) {
+    if (rating?.trackCounts) {
+      const { trackCounts, totalCount } = rating;
+      const s = LocalStorageManager.getSettings();
+      let blockedCount = 0;
+      if (s.skipBlockedArtists) blockedCount += trackCounts.blocked || 0;
+      if (s.skipWarningArtists) blockedCount += trackCounts.warning || 0;
+      if (s.skipUnknownArtists) blockedCount += trackCounts.unknown || 0;
+      const percentage = totalCount > 0 ? Math.round((blockedCount / totalCount) * 100) : 0;
+      return { blockedCount, totalCount, percentage };
+    }
+    return {
+      blockedCount: rating?.blockedCount || 0,
+      totalCount: rating?.totalCount || 0,
+      percentage: rating?.percentage || 0,
+    };
+  }
+
   static renderRatingCard(headerElement, playlist) {
-    const rating = playlist.rating;
-    if (!rating) return;
+    if (!playlist.rating) return;
+    const { percentage, blockedCount, totalCount } = PlaylistViewRenderer.computeRatingDisplay(playlist.rating);
 
     document.getElementById("basify-playlist-rating-card")?.remove();
 
@@ -169,18 +187,18 @@ export class PlaylistViewRenderer {
     card.className = "basify-playlist-rating-card";
 
     const dashArray = 126;
-    const dashOffset = dashArray - (rating.percentage / 100) * dashArray;
+    const dashOffset = dashArray - (percentage / 100) * dashArray;
 
     let strokeColor = "#1ed760";
-    if (rating.percentage > 9) strokeColor = "#f5c542";
-    if (rating.percentage > 29) strokeColor = "#ff4d4d";
+    if (percentage > 9) strokeColor = "#f5c542";
+    if (percentage > 29) strokeColor = "#ff4d4d";
 
     const locale = LocalStorageManager.getSettings().locale;
     const ratingText = locale === "uk" ? "Рейтинг безпеки" : "Safety Rating";
     const subText =
       locale === "uk"
-        ? `${rating.blockedCount} з ${rating.totalCount} треків заблоковано`
-        : `${rating.blockedCount} of ${rating.totalCount} tracks blocked`;
+        ? `${blockedCount} з ${totalCount} треків заблоковано`
+        : `${blockedCount} of ${totalCount} tracks blocked`;
 
     card.innerHTML = `
       <div class="basify-gauge-wrapper">
@@ -204,13 +222,15 @@ export class PlaylistViewRenderer {
 
       if (fillPath && percentageText) {
         fillPath.style.strokeDashoffset = String(dashOffset);
-        PlaylistViewRenderer.animateCounter(percentageText, rating.percentage, 800);
+        PlaylistViewRenderer.animateCounter(percentageText, percentage, 800);
       }
     });
   }
 
   static async scanRows() {
-    const rows = document.querySelectorAll('div[role="row"]');
+    const trackListContainer = document.querySelector("div.main-trackList-trackListContainer");
+    if (!trackListContainer) return;
+    const rows = trackListContainer.querySelectorAll('div[role="row"]');
     const settings = LocalStorageManager.getSettings();
 
     const candidates = [];
@@ -227,6 +247,7 @@ export class PlaylistViewRenderer {
       row.dataset.basifyProcessed = artistIdsString;
 
       row.classList.remove("basify-blocked-row");
+      delete row.dataset.basifyBlockReasons;
       row.querySelectorAll(".basify-playlist-status-icon-wrapper").forEach((el) => {
         el.removeEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
         el.removeEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
@@ -261,15 +282,14 @@ export class PlaylistViewRenderer {
 
     candidates.forEach(({ row, artistLinks, artistIds }) => {
       let shouldSkipRow = false;
+      const blockReasons = [];
 
       artistIds.forEach((id, index) => {
         const artist = artistsById[id];
         const link = artistLinks[index];
         if (!link || !artist) return;
 
-        const labels = artist.labels.length ? artist.labels : ["noInfo"];
-        const priority = ["blocked", "warning", "unknown", "pride", "base", "approved", "noInfo"];
-        const dominantLabel = priority.find((l) => labels.includes(l)) || "noInfo";
+        const dominantLabel = artist.getDominantLabel();
         const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
 
         if (settings.formatNowPlayingArtistName && statusStyle?.color) {
@@ -278,49 +298,40 @@ export class PlaylistViewRenderer {
         }
 
         if (dominantLabel === "blocked" || dominantLabel === "warning" || dominantLabel === "unknown") {
+          blockReasons.push({
+            type: "artist",
+            label: dominantLabel,
+            name: artist.name,
+            description: artist.descriptionEn,
+            descriptionUk: artist.description,
+          });
+        }
+
+        if (settings.showNowPlayingArtistStatusShape) {
           const wrapper = document.createElement("span");
           wrapper.className = "basify-playlist-status-icon-wrapper";
 
-          const iconSpan = document.createElement("span");
-          iconSpan.className = "basify-playlist-status-icon";
-          iconSpan.style.color = statusStyle.color;
-
           const badgeConfig =
             ArtistInfoSectionRenderer.badges[dominantLabel] || ArtistInfoSectionRenderer.badges.noInfo;
-          const labelText = BasifyI18n.t(badgeConfig.textKey);
-
           const locale = LocalStorageManager.getSettings().locale;
+          const labelText = BasifyI18n.t(badgeConfig.textKey);
           const description = locale === "uk" ? artist.description : artist.descriptionEn;
 
           let tooltipText = `${labelText} (${artist.name})`;
-          if (description) {
-            tooltipText += ` - ${description}`;
-          }
+          if (description) tooltipText += ` - ${description}`;
           wrapper.dataset.tooltipText = tooltipText;
 
-          let iconSvg = unknownSvg;
-          if (dominantLabel === "blocked") {
-            iconSvg = banSvg;
-          } else if (dominantLabel === "warning") {
-            iconSvg = warningSvg;
-          }
-
-          iconSpan.innerHTML = iconSvg;
-          const svgElement = iconSpan.querySelector("svg");
-          if (svgElement) {
-            svgElement.setAttribute("width", "12");
-            svgElement.setAttribute("height", "12");
-            svgElement.style.marginLeft = "0";
-          }
-
-          wrapper.appendChild(iconSpan);
+          wrapper.appendChild(NowPlayingArtistRenderer.createStatusShape(dominantLabel));
           wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
           wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
-
           link.parentNode.insertBefore(wrapper, link.nextSibling);
         }
 
-        if (dominantLabel === "blocked") {
+        if (
+          (dominantLabel === "blocked" && settings.skipBlockedArtists) ||
+          (dominantLabel === "warning" && settings.skipWarningArtists) ||
+          (dominantLabel === "unknown" && settings.skipUnknownArtists)
+        ) {
           shouldSkipRow = true;
         }
       });
@@ -336,36 +347,107 @@ export class PlaylistViewRenderer {
           const blockedDistributors = basifyTrack.getBlockedDistributors();
           if (blockedDistributors.length > 0) {
             trackBlocked = true;
-            const lastLink = artistLinks[artistLinks.length - 1];
-            if (lastLink) {
-              const wrapper = document.createElement("span");
-              wrapper.className = "basify-playlist-status-icon-wrapper";
-              const iconSpan = document.createElement("span");
-              iconSpan.className = "basify-playlist-status-icon";
-              iconSpan.style.color = NowPlayingArtistRenderer.statusStyles["blocked"].color;
-              iconSpan.innerHTML = banSvg;
-              const svgEl = iconSpan.querySelector("svg");
-              if (svgEl) {
-                svgEl.setAttribute("width", "12");
-                svgEl.setAttribute("height", "12");
-                svgEl.style.marginLeft = "0";
+            blockReasons.push({ type: "distributor", names: blockedDistributors });
+
+            if (settings.showNowPlayingArtistStatusShape) {
+              const albumLink = row.querySelector('[aria-colindex="3"] a[href^="/album/"]');
+              if (albumLink) {
+                const wrapper = document.createElement("span");
+                wrapper.className = "basify-playlist-status-icon-wrapper";
+                wrapper.appendChild(NowPlayingArtistRenderer.createStatusShape("blocked"));
+                const locale = LocalStorageManager.getSettings().locale;
+                wrapper.dataset.tooltipText = `${BasifyI18n.t("trust.blockedDistributor", locale)}: ${blockedDistributors.join(", ")}`;
+                wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
+                wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
+                const albumSpan = albumLink.parentNode;
+                albumSpan.style.setProperty("margin-inline-end", "0px", "important");
+                albumSpan.parentNode.insertBefore(wrapper, albumSpan.nextSibling);
               }
-              const locale = LocalStorageManager.getSettings().locale;
-              const labelText = locale === "uk" ? "Заблокований дистриб'ютор" : "Blocked distributor";
-              wrapper.dataset.tooltipText = `${labelText}: ${blockedDistributors.join(", ")}`;
-              wrapper.appendChild(iconSpan);
-              wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
-              wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
-              lastLink.parentNode.insertBefore(wrapper, lastLink.nextSibling);
             }
           }
         }
+      }
+
+      if (blockReasons.length) {
+        row.dataset.basifyBlockReasons = JSON.stringify(blockReasons);
       }
 
       if ((shouldSkipRow || trackBlocked) && settings.skipEnabled) {
         row.classList.add("basify-blocked-row");
       }
     });
+  }
+
+  static rescanRows() {
+    document.querySelectorAll("[data-basify-processed]").forEach((el) => el.removeAttribute("data-basify-processed"));
+    PlaylistViewRenderer.scanRows();
+  }
+
+  static updateRatingCard() {
+    const playlist = PlaylistViewRenderer.currentPlaylist;
+    if (!playlist?.rating) return;
+    const card = document.getElementById("basify-playlist-rating-card");
+    if (!card) return;
+    const { percentage, blockedCount, totalCount } = PlaylistViewRenderer.computeRatingDisplay(playlist.rating);
+    const dashArray = 126;
+    const dashOffset = dashArray - (percentage / 100) * dashArray;
+    let strokeColor = "#1ed760";
+    if (percentage > 9) strokeColor = "#f5c542";
+    if (percentage > 29) strokeColor = "#ff4d4d";
+    const fillPath = card.querySelector(".basify-gauge-fill");
+    if (fillPath) {
+      fillPath.setAttribute("stroke", strokeColor);
+      fillPath.style.strokeDashoffset = String(dashOffset);
+    }
+    const pct = card.querySelector(".basify-gauge-percentage");
+    if (pct) pct.textContent = `${percentage}%`;
+    const locale = LocalStorageManager.getSettings().locale;
+    const isUk = locale === "uk";
+    const title = card.querySelector(".basify-rating-title");
+    const sub = card.querySelector(".basify-rating-subtext");
+    if (title) title.textContent = isUk ? "Рейтинг безпеки" : "Safety Rating";
+    if (sub) {
+      sub.textContent = isUk
+        ? `${blockedCount} з ${totalCount} треків заблоковано`
+        : `${blockedCount} of ${totalCount} tracks blocked`;
+    }
+  }
+
+  static recalculateRating() {
+    PlaylistViewRenderer.updateRatingCard();
+  }
+
+  static showBlockedPopup(row) {
+    const reasons = JSON.parse(row.dataset.basifyBlockReasons || "[]");
+    if (!reasons.length) return;
+    const settings = LocalStorageManager.getSettings();
+    const locale = settings.locale;
+    const isUk = locale === "uk";
+
+    const skipLabelSettings = {
+      blocked: settings.skipBlockedArtists,
+      warning: settings.skipWarningArtists,
+      unknown: settings.skipUnknownArtists,
+    };
+
+    const relevantReasons = reasons.filter((r) => {
+      if (r.type === "distributor") return settings.skipBlockedArtists;
+      return !!skipLabelSettings[r.label];
+    });
+    if (!relevantReasons.length) return;
+
+    const parts = relevantReasons.map((r) => {
+      if (r.type === "artist") {
+        const badgeConfig = ArtistInfoSectionRenderer.badges[r.label];
+        const label = BasifyI18n.t(badgeConfig?.textKey || "trust.noInfo", locale);
+        return `${r.name} — ${label}`;
+      }
+      const label = BasifyI18n.t("trust.blockedDistributor", locale);
+      return `${label}: ${r.names.join(", ")}`;
+    });
+
+    const title = isUk ? "Трек заблоковано" : "Track blocked";
+    Spicetify.showNotification(`${title}: ${parts.join(" | ")}`, false, 4000);
   }
 
   static showTooltip(event) {

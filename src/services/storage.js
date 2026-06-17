@@ -9,10 +9,12 @@ export class LocalStorageManager {
   }
 
   static rootKey = "Basify:data";
+  static storageVersion = 2;
   static lock = Promise.resolve();
 
   static createDefaultData() {
     return {
+      version: LocalStorageManager.storageVersion,
       artistsById: {},
       tracksById: {},
       playlistsById: {},
@@ -43,6 +45,17 @@ export class LocalStorageManager {
         return LocalStorageManager.createDefaultData();
       }
       const parsedData = JSON.parse(rawData);
+      if (parsedData.version !== LocalStorageManager.storageVersion) {
+        console.warn(
+          `[Basify] Storage version mismatch (got ${parsedData.version}, expected ${LocalStorageManager.storageVersion}). Clearing cache, keeping settings.`,
+        );
+        const freshData = LocalStorageManager.createDefaultData();
+        if (parsedData.settings) {
+          freshData.settings = { ...freshData.settings, ...parsedData.settings };
+        }
+        LocalStorageManager.saveData(freshData);
+        return freshData;
+      }
       const defaultData = LocalStorageManager.createDefaultData();
       return {
         ...defaultData,
@@ -84,7 +97,7 @@ export class LocalStorageManager {
     return data.artistsById[id] || null;
   }
 
-  static async saveArtist(artistOrArtists) {
+  static async saveArtist(artistOrArtists, additionalProtectedIds = new Set()) {
     const now = Date.now();
     const isArray = Array.isArray(artistOrArtists);
     const savedArtists = (isArray ? artistOrArtists : [artistOrArtists]).map((artist) => ({
@@ -96,17 +109,17 @@ export class LocalStorageManager {
       savedArtists.forEach((artist) => {
         data.artistsById[artist.id] = artist;
       });
-      LocalStorageManager.trimArtistCache(data);
+      LocalStorageManager.trimArtistCache(data, additionalProtectedIds);
     });
     return isArray ? savedArtists : savedArtists[0];
   }
 
-  static trimArtistCache(data) {
+  static trimArtistCache(data, additionalProtectedIds = new Set()) {
     const limit = data.settings.artistCacheLimit;
     const artists = Object.values(data.artistsById);
     if (artists.length <= limit) return;
 
-    const protectedArtistIds = new Set();
+    const protectedArtistIds = new Set(additionalProtectedIds);
     Object.values(data.tracksById || {}).forEach((track) => {
       (track.artistIds || []).forEach((artistId) => protectedArtistIds.add(artistId));
     });

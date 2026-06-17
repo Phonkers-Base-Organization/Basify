@@ -3,8 +3,6 @@ import { crownSvg, starSvg, unknownSvg } from "../constants/icons.js";
 
 export class NowPlayingArtistRenderer {
   static styleElementId = "basify-now-playing-artist-style";
-  static labelPriority = ["blocked", "warning", "unknown", "pride", "base", "approved", "noInfo"];
-
   static statusStyles = {
     blocked: { color: "#ff4d4d", shape: "square" },
     warning: { color: "#f5c542", shape: "triangle" },
@@ -33,7 +31,7 @@ export class NowPlayingArtistRenderer {
       const artist = artists.find((trackArtist) => trackArtist.id === artistId);
       NowPlayingArtistRenderer.resetArtistSpan(artistSpan);
       if (!artist) return;
-      const dominantLabel = NowPlayingArtistRenderer.getDominantArtistLabel(artist);
+      const dominantLabel = artist.getDominantLabel();
       const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
       const artistLink = artistSpan.querySelector("a") || artistSpan;
 
@@ -60,11 +58,6 @@ export class NowPlayingArtistRenderer {
     const artistLink = artistSpan.querySelector("a") || artistSpan;
     artistLink.classList.remove("basify-now-playing-artist-name");
     artistLink.style.removeProperty("--basify-artist-status-color");
-  }
-
-  static getDominantArtistLabel(artist) {
-    const labels = artist.labels.length ? artist.labels : ["noInfo"];
-    return NowPlayingArtistRenderer.labelPriority.find((label) => labels.includes(label)) || "noInfo";
   }
 
   static createStatusShape(label) {

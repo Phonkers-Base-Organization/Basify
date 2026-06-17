@@ -82,4 +82,13 @@ export const BLOCKED_DISTRIBUTORS = [
   "РНБ КЛУБ",
   "ROZETKA DIGITAL",
   "SAIBOT Music",
+  "RU.MEDIA",
+  "RAVEON",
+  "MIDNIGHT CLUB",
+  "VOTE SOUND",
+  "TEAM I8 DISTRIBUTION",
+  "YOF MUSIC",
+  "VAVA MEDIA",
+  "ICY MOB",
+  "VK RECORDS",
 ];

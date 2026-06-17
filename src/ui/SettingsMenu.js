@@ -5,7 +5,7 @@ import { NowPlayingRuntimeState } from "../state/runtimeState.js";
 import { NowPlayingThemeOverlayRenderer } from "./ThemeOverlay.js";
 import { refreshCurrentArtistPage, skipTrackIfNeeded, renderNowPlayingTrack } from "../index.js";
 import { settingsSvg, phonkersbaseLogoSvg } from "../constants/icons.js";
-// import { PlaylistViewRenderer } from "./PlaylistView.js";
+import { PlaylistViewRenderer } from "./PlaylistView.js";
 
 const React = Spicetify.React;
 
@@ -98,6 +98,7 @@ export class SettingsMenu {
 
     if (localeChanged) {
       SettingsMenu.updateLocalizedTitles(settings.locale);
+      PlaylistViewRenderer.updateRatingCard();
     }
 
     const track = NowPlayingRuntimeState.track;
@@ -119,20 +120,6 @@ export class SettingsMenu {
       }
     }
 
-    // if (Object.hasOwn(changedSettings, "showPlaylistRating")) {
-    //   const pathParts = Spicetify.Platform.History.location.pathname.split("/");
-    //   if (pathParts[1] === "playlist" && pathParts[2]) {
-    //     PlaylistViewRenderer.renderRatingCard(pathParts[2]).catch(() => {});
-    //   }
-    // }
-
-    // if (Object.hasOwn(changedSettings, "skipEnabled")) {
-    //   document.querySelectorAll('div[role="row"]').forEach((row) => {
-    //     row.removeAttribute("data-basify-processed");
-    //   });
-    //   PlaylistViewRenderer.scanRows();
-    // }
-
     if (emojiFlagsChanged || localeChanged) {
       refreshCurrentArtistPage().catch((error) => {
         console.warn("Basify failed to refresh artist page:", error);
@@ -145,8 +132,23 @@ export class SettingsMenu {
       Object.hasOwn(changedSettings, "skipWarningArtists") ||
       Object.hasOwn(changedSettings, "skipUnknownArtists");
 
-    if (!skipSettingsChanged || !track) return;
-    skipTrackIfNeeded(track);
+    const playlistDisplaySettingsChanged =
+      localeChanged ||
+      Object.hasOwn(changedSettings, "formatNowPlayingArtistName") ||
+      Object.hasOwn(changedSettings, "showNowPlayingArtistStatusShape") ||
+      skipSettingsChanged;
+
+    if (playlistDisplaySettingsChanged) {
+      PlaylistViewRenderer.rescanRows();
+    }
+
+    if (skipSettingsChanged) {
+      PlaylistViewRenderer.recalculateRating();
+    }
+
+    if (skipSettingsChanged && track) {
+      skipTrackIfNeeded(track);
+    }
   }
 
   static Component() {

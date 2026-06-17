@@ -108,6 +108,7 @@ async function startup() {
   loadArtistPage().catch(() => {});
   loadPlaylistPage().catch(() => {});
   songChangeHandler().catch(() => {});
+  Artist.refreshStaleCache().catch(() => {});
 }
 
 function main() {

@@ -5,6 +5,7 @@ export class Artist {
   static baseArtistURL = "open.spotify.com/artist/";
   static apiURL = "https://api.phonkersbase.com/api/v1/artist/all?search=";
   static cacheMaxAgeMs = 24 * 60 * 60 * 1000;
+  static labelPriority = ["blocked", "warning", "unknown", "pride", "base", "approved", "noInfo"];
 
   static isCacheStale(artistData) {
     return !artistData?.updatedAt || Date.now() - artistData.updatedAt > Artist.cacheMaxAgeMs;
@@ -20,6 +21,11 @@ export class Artist {
     this.labels = data.labels || [];
     this.updatedAt = data.updatedAt || Date.now();
     this.lastUsedAt = data.lastUsedAt || Date.now();
+  }
+
+  getDominantLabel() {
+    const labels = this.labels.length ? this.labels : ["noInfo"];
+    return Artist.labelPriority.find((label) => labels.includes(label)) || "noInfo";
   }
 
   static async create(artistId, fallbackName = null) {
@@ -91,7 +97,8 @@ export class Artist {
 
     const fetchedArtistsData = await Artist.fetchMany(missingArtists);
 
-    const savedArtistsData = await LocalStorageManager.saveArtist(fetchedArtistsData);
+    const allInputIds = new Set(artistsData.map(({ id }) => id).filter(Boolean));
+    const savedArtistsData = await LocalStorageManager.saveArtist(fetchedArtistsData, allInputIds);
 
     savedArtistsData.forEach((artistData) => {
       artistsById[artistData.id] = new Artist(artistData);
@@ -160,5 +167,18 @@ export class Artist {
       description: null,
       descriptionEn: null,
     };
+  }
+
+  static async refreshStaleCache() {
+    const data = LocalStorageManager.loadData();
+    const staleArtists = Object.values(data.artistsById)
+      .filter((artist) => Artist.isCacheStale(artist))
+      .map(({ id, name }) => ({ id, name: name || null }));
+
+    if (!staleArtists.length) return;
+
+    console.log(`[Basify] Refreshing ${staleArtists.length} stale artist(s)...`);
+    const fetchedData = await Artist.fetchMany(staleArtists);
+    await LocalStorageManager.saveArtist(fetchedData);
   }
 }

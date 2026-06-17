@@ -195,6 +195,16 @@ export class BasifyTrack {
     return reasons;
   }
 
+  getTrackDominantStatus() {
+    if (this.isDistributorBlocked()) return "blocked";
+    const allLabels = this.artists.flatMap((artist) => this.getArtistLabels(artist));
+    if (allLabels.includes("blocked")) return "blocked";
+    if (allLabels.includes("warning")) return "warning";
+    if (allLabels.includes("unknown")) return "unknown";
+    if (allLabels.every((l) => l === "noInfo")) return "noInfo";
+    return "clean";
+  }
+
   getTrackTheme() {
     if (this.isDistributorBlocked()) return "blocked";
     const labels = this.artists.flatMap((artist) => this.getArtistLabels(artist));

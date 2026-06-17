@@ -6,9 +6,11 @@ var Basify = (function(exports) {
 			return Spicetify.LocalStorage;
 		}
 		static rootKey = "Basify:data";
+		static storageVersion = 2;
 		static lock = Promise.resolve();
 		static createDefaultData() {
 			return {
+				version: LocalStorageManager.storageVersion,
 				artistsById: {},
 				tracksById: {},
 				playlistsById: {},
@@ -36,6 +38,16 @@ var Basify = (function(exports) {
 				const rawData = LocalStorageManager.storage.get(LocalStorageManager.rootKey);
 				if (!rawData) return LocalStorageManager.createDefaultData();
 				const parsedData = JSON.parse(rawData);
+				if (parsedData.version !== LocalStorageManager.storageVersion) {
+					console.warn(`[Basify] Storage version mismatch (got ${parsedData.version}, expected ${LocalStorageManager.storageVersion}). Clearing cache, keeping settings.`);
+					const freshData = LocalStorageManager.createDefaultData();
+					if (parsedData.settings) freshData.settings = {
+						...freshData.settings,
+						...parsedData.settings
+					};
+					LocalStorageManager.saveData(freshData);
+					return freshData;
+				}
 				const defaultData = LocalStorageManager.createDefaultData();
 				return {
 					...defaultData,
@@ -70,7 +82,7 @@ var Basify = (function(exports) {
 		static getArtist(id) {
 			return LocalStorageManager.loadData().artistsById[id] || null;
 		}
-		static async saveArtist(artistOrArtists) {
+		static async saveArtist(artistOrArtists, additionalProtectedIds = /* @__PURE__ */ new Set()) {
 			const now = Date.now();
 			const isArray = Array.isArray(artistOrArtists);
 			const savedArtists = (isArray ? artistOrArtists : [artistOrArtists]).map((artist) => ({
@@ -82,15 +94,15 @@ var Basify = (function(exports) {
 				savedArtists.forEach((artist) => {
 					data.artistsById[artist.id] = artist;
 				});
-				LocalStorageManager.trimArtistCache(data);
+				LocalStorageManager.trimArtistCache(data, additionalProtectedIds);
 			});
 			return isArray ? savedArtists : savedArtists[0];
 		}
-		static trimArtistCache(data) {
+		static trimArtistCache(data, additionalProtectedIds = /* @__PURE__ */ new Set()) {
 			const limit = data.settings.artistCacheLimit;
 			const artists = Object.values(data.artistsById);
 			if (artists.length <= limit) return;
-			const protectedArtistIds = /* @__PURE__ */ new Set();
+			const protectedArtistIds = new Set(additionalProtectedIds);
 			Object.values(data.tracksById || {}).forEach((track) => {
 				(track.artistIds || []).forEach((artistId) => protectedArtistIds.add(artistId));
 			});
@@ -935,6 +947,1312 @@ var Basify = (function(exports) {
 		}
 	};
 	//#endregion
+	//#region src/models/Country.js
+	var Country = class Country {
+		constructor(countryCode = null) {
+			this.countryCode = countryCode.toLowerCase();
+		}
+		flagImg(useEmojiFlag = true, marginLeft = 0, height = 12, width = 16) {
+			const img = document.createElement("img");
+			img.src = useEmojiFlag ? `https://flagcdn.com/${width}x${height}/${this.countryCode}.png` : `https://flagcdn.com/h${Country.getClosestFlagHeight(height)}/${this.countryCode}.png`;
+			img.alt = this.countryCode;
+			img.style.marginLeft = `${marginLeft}px`;
+			img.style.verticalAlign = "middle";
+			img.style.width = `${width}px`;
+			img.style.height = `${height}px`;
+			return img;
+		}
+		static getClosestFlagHeight(height) {
+			return [
+				20,
+				24,
+				40,
+				60,
+				80,
+				120,
+				240
+			].reduce((closestHeight, currentHeight) => {
+				const closestDifference = Math.abs(closestHeight - height);
+				return Math.abs(currentHeight - height) < closestDifference ? currentHeight : closestHeight;
+			});
+		}
+	};
+	//#endregion
+	//#region src/models/Artist.js
+	var Artist = class Artist {
+		static baseArtistURL = "open.spotify.com/artist/";
+		static apiURL = "https://api.phonkersbase.com/api/v1/artist/all?search=";
+		static cacheMaxAgeMs = 1440 * 60 * 1e3;
+		static labelPriority = [
+			"blocked",
+			"warning",
+			"unknown",
+			"pride",
+			"base",
+			"approved",
+			"noInfo"
+		];
+		static isCacheStale(artistData) {
+			return !artistData?.updatedAt || Date.now() - artistData.updatedAt > Artist.cacheMaxAgeMs;
+		}
+		constructor(data) {
+			this.id = data.id;
+			this.name = data.name;
+			this.url = data.url;
+			this.description = data.description || null;
+			this.descriptionEn = data.descriptionEn || null;
+			this.countries = (data.countries || []).map((country) => new Country(country.countryCode));
+			this.labels = data.labels || [];
+			this.updatedAt = data.updatedAt || Date.now();
+			this.lastUsedAt = data.lastUsedAt || Date.now();
+		}
+		getDominantLabel() {
+			const labels = this.labels.length ? this.labels : ["noInfo"];
+			return Artist.labelPriority.find((label) => labels.includes(label)) || "noInfo";
+		}
+		static async create(artistId, fallbackName = null) {
+			const cachedArtistData = LocalStorageManager.getArtist(artistId);
+			if (cachedArtistData && !Artist.isCacheStale(cachedArtistData)) {
+				console.log("Loading artist from local storage", artistId);
+				if (!cachedArtistData.name && fallbackName) cachedArtistData.name = fallbackName;
+				return new Artist(await LocalStorageManager.markArtistUsed(artistId) || cachedArtistData);
+			}
+			if (cachedArtistData && Artist.isCacheStale(cachedArtistData)) console.log("Artist information from local storage is expired", artistId);
+			const fetchedArtistData = await Artist.fetch(artistId, fallbackName);
+			return new Artist(await LocalStorageManager.saveArtist(fetchedArtistData));
+		}
+		static async fetch(artistId, fallbackName = null) {
+			Artist.baseArtistURL + artistId;
+			const requestURL = Artist.apiURL + encodeURIComponent(artistId);
+			console.log("Requesting artist from db", artistId);
+			try {
+				const responseData = await fetch(requestURL, {
+					method: "GET",
+					headers: { Accept: "application/json" }
+				});
+				const artistItem = JSON.parse(await responseData.text()).items[0];
+				if (!artistItem) return Artist.createFallbackArtistData(artistId, fallbackName);
+				return Artist.fromApiArtistItem(artistItem, artistId, fallbackName);
+			} catch (e) {
+				return Artist.createFallbackArtistData(artistId, fallbackName);
+			}
+		}
+		static async createMany(artistsData) {
+			const artistsById = {};
+			const missingArtists = [];
+			artistsData.forEach(({ id, name }) => {
+				if (!id) return;
+				const cachedArtistData = LocalStorageManager.getArtist(id);
+				if (cachedArtistData && !Artist.isCacheStale(cachedArtistData)) {
+					if (!cachedArtistData.name && name) cachedArtistData.name = name;
+					artistsById[id] = new Artist(cachedArtistData);
+					LocalStorageManager.markArtistUsed(id).catch(() => {});
+					return;
+				}
+				missingArtists.push({
+					id,
+					name: name || null
+				});
+			});
+			if (!missingArtists.length) return artistsById;
+			const fetchedArtistsData = await Artist.fetchMany(missingArtists);
+			const allInputIds = new Set(artistsData.map(({ id }) => id).filter(Boolean));
+			(await LocalStorageManager.saveArtist(fetchedArtistsData, allInputIds)).forEach((artistData) => {
+				artistsById[artistData.id] = new Artist(artistData);
+			});
+			return artistsById;
+		}
+		static async fetchMany(artistsData) {
+			const artistIds = artistsData.map((artist) => artist.id);
+			const requestURL = Artist.apiURL + encodeURIComponent(artistIds.join(","));
+			console.log("[Basify] Requesting artists from db:", artistIds);
+			try {
+				const responseData = await fetch(requestURL, {
+					method: "GET",
+					headers: { Accept: "application/json" }
+				});
+				const artistItems = JSON.parse(await responseData.text()).items || [];
+				const artistsBySpotifyId = {};
+				artistItems.forEach((artistItem) => {
+					if (!artistItem.spotifyId) return;
+					artistsBySpotifyId[artistItem.spotifyId] = artistItem;
+				});
+				return artistsData.map(({ id, name }) => {
+					const artistItem = artistsBySpotifyId[id];
+					if (!artistItem) return Artist.createFallbackArtistData(id, name);
+					return Artist.fromApiArtistItem(artistItem, id, name);
+				});
+			} catch (e) {
+				return artistsData.map(({ id, name }) => Artist.createFallbackArtistData(id, name));
+			}
+		}
+		static fromApiArtistItem(artistItem, artistId, fallbackName = null) {
+			const spotifyId = artistItem.spotifyId || artistId;
+			const artistURL = Artist.baseArtistURL + spotifyId;
+			return {
+				id: spotifyId,
+				name: artistItem.name || fallbackName,
+				url: artistURL,
+				description: artistItem.description || null,
+				descriptionEn: artistItem.descriptionEn || null,
+				countries: (artistItem.countries || []).map((countryData) => new Country(countryData.code)),
+				labels: (artistItem.listenLabels || []).map((labelData) => labelData.name)
+			};
+		}
+		static createFallbackArtistData(artistId, fallbackName = null) {
+			return {
+				id: artistId,
+				name: fallbackName,
+				url: Artist.baseArtistURL + artistId,
+				countries: [],
+				labels: [],
+				description: null,
+				descriptionEn: null
+			};
+		}
+		static async refreshStaleCache() {
+			const data = LocalStorageManager.loadData();
+			const staleArtists = Object.values(data.artistsById).filter((artist) => Artist.isCacheStale(artist)).map(({ id, name }) => ({
+				id,
+				name: name || null
+			}));
+			if (!staleArtists.length) return;
+			console.log(`[Basify] Refreshing ${staleArtists.length} stale artist(s)...`);
+			const fetchedData = await Artist.fetchMany(staleArtists);
+			await LocalStorageManager.saveArtist(fetchedData);
+		}
+	};
+	//#endregion
+	//#region src/constants/distributors.js
+	var BLOCKED_DISTRIBUTORS = [
+		"0TO8",
+		"88 CEBEP",
+		"682 MUSIC",
+		"ADVANCE",
+		"ALONE STARZ",
+		"ANARCHY RECORDS",
+		"ARCADIA",
+		"BADTRIP MUSIC",
+		"BLXCK MEDIA",
+		"BURNT PLANET MUSIC",
+		"CEPHALON",
+		"CRESTA LA CULTURA",
+		"CXLTXRY",
+		"DEAD TWENTY MEDIA",
+		"DECLIPED",
+		"DIGITAL RECORD’S MEDIA",
+		"DIRTYBLADES RECORDS",
+		"DOOM MEDIA RECORDS",
+		"ECHO8",
+		"EFFECTIVE RECORDS",
+		"EMMETT ZETTO",
+		"FRESHMAN MUSIC",
+		"GOOST MUSIC",
+		"HOBOSHRINE",
+		"HOODMAFIA",
+		"ILLUSIONE",
+		"IMMINENT",
+		"LIFESTYLE",
+		"MAVS MUSIC",
+		"MEDIAHATE MUSIC",
+		"MEMPHIS 1996",
+		"MEMPHIS CULT",
+		"MERPHI MUSIC GROUP",
+		"MIZYSQUAD",
+		"MNRC RECORDS",
+		"MOONMUZ+",
+		"NEDOSTUPNOSTЬ",
+		"NEEDLMUSIC",
+		"NYUKTA",
+		"OVERDO$E RECORDS",
+		"PANDA MUSIC",
+		"PHONK POINT",
+		"RHYMES",
+		"RPLUS",
+		"SAVAGE$TATION",
+		"STRADA MUSIC",
+		"SVOBODA",
+		"UNTITLED BURIAL",
+		"WHY Z MUSIC",
+		"YELLOW CHAIR",
+		"СТУДИЯ СОЮЗ",
+		"VOLUME100",
+		"ALLSTARS DISTRIBUTION",
+		"MUSIC ALLIGATOR",
+		"KOALA MUSIC",
+		"PHONKMEDIA",
+		"EVILEAF",
+		"СОЮЗ МЬЮЗИК",
+		"SCARED CULT",
+		"OCCULTWAVES",
+		"HARMONY HUSTLERS",
+		"COWBELLKILLAZ",
+		"CHERRY CULT",
+		"DXFO",
+		"HASLETT CULT",
+		"HATEWAVE",
+		"ZVONKO DIGITAL",
+		"YOURTUNES",
+		"SFEROOM DISTRIBUTION",
+		"ONERPM",
+		"MIN.ECO",
+		"BELIVE",
+		"EVILSET",
+		"ПЕРВОЕ МУЗЫКАЛЬНОЕ",
+		"FRESHTUNES",
+		"PLAYA POSSE",
+		"VELVET MUSIC",
+		"GAMMA MUSIC",
+		"PEPERFUNK RECORDINGS",
+		"РНБ КЛУБ",
+		"ROZETKA DIGITAL",
+		"SAIBOT Music",
+		"RU.MEDIA",
+		"RAVEON",
+		"MIDNIGHT CLUB",
+		"VOTE SOUND",
+		"TEAM I8 DISTRIBUTION",
+		"YOF MUSIC",
+		"VAVA MEDIA",
+		"ICY MOB",
+		"VK RECORDS"
+	];
+	//#endregion
+	//#region src/utils/domObserver.js
+	var DomObserver = class DomObserver {
+		static async waitUntil(conditionCallback, timeoutMs = 5e3, intervalMs = 100) {
+			const startTime = Date.now();
+			return new Promise((resolve, reject) => {
+				const intervalId = setInterval(() => {
+					try {
+						const result = conditionCallback();
+						if (result) {
+							clearInterval(intervalId);
+							resolve(result);
+							return;
+						}
+						if (Date.now() - startTime >= timeoutMs) {
+							clearInterval(intervalId);
+							reject(/* @__PURE__ */ new Error("Basify waitUntil timed out"));
+						}
+					} catch (error) {
+						clearInterval(intervalId);
+						reject(error);
+					}
+				}, intervalMs);
+			});
+		}
+		static async waitForElement(selector, timeoutMs = 5e3) {
+			return DomObserver.waitUntil(() => document.querySelector(selector), timeoutMs);
+		}
+		static async waitForNowPlayingArtistSpans(track, timeoutMs = 5e3) {
+			return DomObserver.waitUntil(() => {
+				const bottomBarArtistsContainer = document.querySelector("div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo");
+				const sideViewArtistsContainer = document.querySelector("div.Root__right-sidebar div.main-nowPlayingView-nowPlayingWidget div.main-trackInfo-artists span.OINH5zA0pQyzffwo");
+				if (!bottomBarArtistsContainer) return null;
+				const trackArtistIds = (track?.artists || []).map((artist) => artist.uri.split(":")[2]);
+				const bottomBarArtistSpansById = DomObserver.extractArtistDataFromContainer(bottomBarArtistsContainer);
+				if (!DomObserver.haveSameArtistIds(Object.keys(bottomBarArtistSpansById), trackArtistIds)) return null;
+				let sideViewArtistSpansById = {};
+				if (sideViewArtistsContainer) {
+					sideViewArtistSpansById = DomObserver.extractArtistDataFromContainer(sideViewArtistsContainer);
+					if (!DomObserver.haveSameArtistIds(Object.keys(sideViewArtistSpansById), trackArtistIds)) return null;
+				}
+				return {
+					bottomBarArtistSpans: bottomBarArtistSpansById,
+					sideViewArtistSpans: sideViewArtistSpansById
+				};
+			}, timeoutMs);
+		}
+		static extractArtistDataFromContainer(artistsContainer) {
+			const artistLinks = Array.from(artistsContainer.querySelectorAll("a"));
+			const artistSpansById = {};
+			artistLinks.forEach((artistLink) => {
+				const artistId = artistLink.href.split("/").pop();
+				const artistSpan = artistLink.closest("span");
+				if (!artistId || !artistSpan) return;
+				artistSpansById[artistId] = artistSpan;
+			});
+			return artistSpansById;
+		}
+		static haveSameArtistIds(firstArtistIds, secondArtistIds) {
+			if (firstArtistIds.length !== secondArtistIds.length) return false;
+			const sortedFirstArtistIds = [...firstArtistIds].sort();
+			const sortedSecondArtistIds = [...secondArtistIds].sort();
+			return sortedFirstArtistIds.every((artistId, index) => artistId === sortedSecondArtistIds[index]);
+		}
+		static async waitForArtistPageHeaderElement(artistId, timeoutMs = 5e3) {
+			return DomObserver.waitUntil(() => {
+				const headerTitleElement = document.querySelector(".main-entityHeader-container.main-entityHeader-containerFlex");
+				if (!headerTitleElement) return null;
+				if (Spicetify.Platform.History.location.pathname.split("/")[2] !== artistId) return null;
+				return headerTitleElement;
+			}, timeoutMs);
+		}
+	};
+	//#endregion
+	//#region src/models/Track.js
+	var BasifyTrack = class BasifyTrack {
+		constructor(data, trackArtists = []) {
+			trackArtists = trackArtists || [];
+			this.id = data.id;
+			this.uri = data.uri;
+			this.name = data.name;
+			this.albumUri = data.albumUri || null;
+			this.imageUrl = data.imageUrl || null;
+			this.distributors = data.distributors || [];
+			this.artistIds = data.artistIds || trackArtists.map((artist) => artist.id);
+			this.artistsById = {};
+			trackArtists.forEach((artist) => {
+				this.artistsById[artist.id] = artist;
+			});
+			this.updatedAt = data.updatedAt || Date.now();
+			this.lastUsedAt = data.lastUsedAt || Date.now();
+		}
+		get artists() {
+			return Object.values(this.artistsById);
+		}
+		static async create(spotifyTrack, trackArtists = []) {
+			const trackId = spotifyTrack.uri?.split(":")?.[2] || null;
+			const cachedTrackData = trackId ? LocalStorageManager.getTrack(trackId) : null;
+			if (cachedTrackData) {
+				console.log("Loading track from local storage", trackId);
+				return new BasifyTrack(await LocalStorageManager.markTrackUsed(trackId) || cachedTrackData, trackArtists);
+			}
+			const fetchedTrackData = await BasifyTrack.fetch(spotifyTrack, trackArtists);
+			return new BasifyTrack(await LocalStorageManager.saveTrack(fetchedTrackData), trackArtists);
+		}
+		static async getTrackArtists(spotifyTrack) {
+			const artistsData = spotifyTrack?.artists || [];
+			return Promise.all(artistsData.map((a) => Artist.create(a.uri.split(":")[2], a.name)));
+		}
+		static async createFromNowPlaying(spotifyTrack) {
+			try {
+				const [trackArtists, artistSpans] = await Promise.all([BasifyTrack.getTrackArtists(spotifyTrack), DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5e3).catch(() => null)]);
+				return {
+					basifyTrack: await BasifyTrack.create(spotifyTrack, trackArtists),
+					artistSpans
+				};
+			} catch (e) {
+				return null;
+			}
+		}
+		static async fetch(spotifyTrack, trackArtists = []) {
+			const distributors = await BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []);
+			console.log("Requesting track info from Spotify", spotifyTrack.uri.split(":")[2]);
+			return {
+				id: spotifyTrack.uri?.split(":")?.[2] || null,
+				uri: spotifyTrack.uri,
+				name: spotifyTrack.name || BasifyI18n.t("unknownTrack"),
+				albumUri: spotifyTrack.album?.uri || null,
+				imageUrl: BasifyTrack.getTrackImageUrl(spotifyTrack),
+				artistIds: trackArtists.map((artist) => artist.id),
+				distributors
+			};
+		}
+		static async createMany(items) {
+			const tracksById = {};
+			const missingItems = [];
+			items.forEach(({ track, trackArtists = [] }) => {
+				const id = track.uri?.split(":")?.[2];
+				if (!id) return;
+				const cachedTrackData = LocalStorageManager.getTrack(id);
+				if (cachedTrackData) {
+					tracksById[id] = new BasifyTrack(cachedTrackData, trackArtists);
+					LocalStorageManager.markTrackUsed(id).catch(() => {});
+					return;
+				}
+				missingItems.push({
+					track,
+					trackArtists
+				});
+			});
+			if (!missingItems.length) return tracksById;
+			const fetchedTracksData = await Promise.all(missingItems.map(({ track, trackArtists }) => BasifyTrack.fetch(track, trackArtists)));
+			(await LocalStorageManager.saveTrack(fetchedTracksData)).forEach((trackData, index) => {
+				const { trackArtists } = missingItems[index];
+				tracksById[trackData.id] = new BasifyTrack(trackData, trackArtists);
+			});
+			return tracksById;
+		}
+		static async getDistributorsFromSpotifyTrack(spotifyTrack) {
+			const albumUri = spotifyTrack?.album?.uri;
+			if (!albumUri) return [];
+			try {
+				const { getAlbum } = Spicetify.GraphQL.Definitions;
+				const album = (await Spicetify.GraphQL.Request(getAlbum, {
+					uri: albumUri,
+					locale: "",
+					offset: 0,
+					limit: 50
+				}))?.data?.albumUnion;
+				const distributorTexts = [];
+				if (album?.label) distributorTexts.push(album.label);
+				(album?.copyright?.items || []).forEach((item) => {
+					if (!item?.text) return;
+					distributorTexts.push(item.text);
+				});
+				return [...new Set(distributorTexts.filter(Boolean))];
+			} catch (error) {
+				console.warn("Basify failed to load album distributor data:", error);
+				return [];
+			}
+		}
+		getBlockedDistributors() {
+			return BLOCKED_DISTRIBUTORS.filter((blockedDistributor) => {
+				const normalizedBlockedDistributor = BasifyTrack.normalizeDistributorName(blockedDistributor);
+				return this.distributors.some((distributorText) => {
+					return BasifyTrack.normalizeDistributorName(distributorText).includes(normalizedBlockedDistributor);
+				});
+			});
+		}
+		isDistributorBlocked() {
+			return this.getBlockedDistributors().length > 0;
+		}
+		getArtistLabels(artist) {
+			return artist.labels.length ? artist.labels : ["noInfo"];
+		}
+		shouldSkipTrack() {
+			if (!LocalStorageManager.getSettings().skipEnabled) return false;
+			return this.getSkipReasons().length > 0;
+		}
+		getSkipReasons() {
+			const settings = LocalStorageManager.getSettings();
+			const reasons = [];
+			const blockedDistros = this.getBlockedDistributors();
+			if (settings.skipBlockedArtists && blockedDistros.length > 0) blockedDistros.forEach((distributor) => {
+				reasons.push({
+					type: "distributor",
+					name: distributor,
+					label: "blockedDistributor"
+				});
+			});
+			const skipLabelSettings = {
+				blocked: settings.skipBlockedArtists,
+				warning: settings.skipWarningArtists,
+				unknown: settings.skipUnknownArtists
+			};
+			this.artists.forEach((artist) => {
+				this.getArtistLabels(artist).forEach((label) => {
+					if (skipLabelSettings[label]) reasons.push({
+						type: "artist",
+						artist,
+						label
+					});
+				});
+			});
+			return reasons;
+		}
+		getTrackDominantStatus() {
+			if (this.isDistributorBlocked()) return "blocked";
+			const allLabels = this.artists.flatMap((artist) => this.getArtistLabels(artist));
+			if (allLabels.includes("blocked")) return "blocked";
+			if (allLabels.includes("warning")) return "warning";
+			if (allLabels.includes("unknown")) return "unknown";
+			if (allLabels.every((l) => l === "noInfo")) return "noInfo";
+			return "clean";
+		}
+		getTrackTheme() {
+			if (this.isDistributorBlocked()) return "blocked";
+			const labels = this.artists.flatMap((artist) => this.getArtistLabels(artist));
+			return [
+				"blocked",
+				"pride",
+				"base",
+				"approved",
+				"unknown",
+				"noInfo"
+			].find((themeStatus) => labels.includes(themeStatus)) || null;
+		}
+		async getDominantColor() {
+			if (!this.imageUrl) return null;
+			return BasifyTrack.extractDominantColorFromImage(this.imageUrl);
+		}
+		static getTrackImageUrl(spotifyTrack) {
+			const imageUri = spotifyTrack?.images?.[0]?.url || spotifyTrack?.album?.images?.[0]?.url || spotifyTrack?.metadata?.image_xlarge_url || spotifyTrack?.metadata?.image_large_url || spotifyTrack?.metadata?.image_url;
+			if (!imageUri) return null;
+			if (imageUri.startsWith("https://")) return imageUri;
+			const imageId = imageUri.split(":")?.[2];
+			if (!imageId) return null;
+			return `https://i.scdn.co/image/${imageId}`;
+		}
+		static extractDominantColorFromImage(imageUrl) {
+			return new Promise((resolve) => {
+				const image = new Image();
+				image.crossOrigin = "anonymous";
+				image.src = imageUrl;
+				image.onload = () => {
+					try {
+						const canvas = document.createElement("canvas");
+						const size = 48;
+						canvas.width = size;
+						canvas.height = size;
+						const context = canvas.getContext("2d", { willReadFrequently: true });
+						context.drawImage(image, 0, 0, size, size);
+						const pixels = context.getImageData(0, 0, size, size).data;
+						const colorBuckets = /* @__PURE__ */ new Map();
+						for (let i = 0; i < pixels.length; i += 4) {
+							if (pixels[i + 3] < 128) continue;
+							const r = pixels[i];
+							const g = pixels[i + 1];
+							const b = pixels[i + 2];
+							const brightness = (r + g + b) / 3;
+							if (brightness < 25 || brightness > 235) continue;
+							const q = (v) => Math.min(255, Math.round(v / 24) * 24);
+							const key = `${q(r)},${q(g)},${q(b)}`;
+							colorBuckets.set(key, (colorBuckets.get(key) || 0) + 1);
+						}
+						let dominantColor = null;
+						let dominantCount = 0;
+						colorBuckets.forEach((count, color) => {
+							if (count > dominantCount) {
+								dominantColor = color;
+								dominantCount = count;
+							}
+						});
+						if (!dominantColor) {
+							resolve(null);
+							return;
+						}
+						const [r, g, b] = dominantColor.split(",").map(Number);
+						resolve(BasifyTrack.rgbToHex(r, g, b));
+					} catch (e) {
+						resolve(null);
+					}
+				};
+				image.onerror = () => resolve(null);
+			});
+		}
+		static rgbToHex(r, g, b) {
+			return `#${[
+				r,
+				g,
+				b
+			].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("")}`;
+		}
+		static normalizeDistributorName(v) {
+			return String(v).toLowerCase().replace(/[©℗]/gu, "").replace(/\b\d{4}\b/gu, "").replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/gu, " ").trim();
+		}
+	};
+	//#endregion
+	//#region src/models/Playlist.js
+	var Playlist = class Playlist {
+		constructor(data) {
+			this.id = data.id;
+			this.name = data.name || null;
+			this.rating = data.rating || null;
+			this.trackIds = data.trackIds || [];
+			this.updatedAt = data.updatedAt || Date.now();
+			this.lastUsedAt = data.lastUsedAt || Date.now();
+		}
+		static async create(playlistId, shouldContinue = () => true) {
+			const playlistUri = "spotify:playlist:" + playlistId;
+			const trackIds = await Playlist.fetchTrackIds(playlistUri, shouldContinue);
+			const cachedPlaylistData = LocalStorageManager.getPlaylist(playlistId);
+			const sameTrackIds = cachedPlaylistData && Playlist.sameTrackIds(trackIds, cachedPlaylistData.trackIds);
+			const allTracksCached = trackIds.every((id) => LocalStorageManager.getTrack(id));
+			if (sameTrackIds && allTracksCached) return new Playlist(await LocalStorageManager.markPlaylistUsed(playlistId) || cachedPlaylistData);
+			if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
+			const name = (await Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri).catch(() => null))?.name || null;
+			const fetchedPlaylistData = await Playlist.fetch(playlistId, name, shouldContinue);
+			return new Playlist(await LocalStorageManager.savePlaylist(fetchedPlaylistData));
+		}
+		static sameTrackIds(currentTrackIds, cachedTrackIds = []) {
+			if (currentTrackIds.length !== cachedTrackIds.length) return false;
+			return currentTrackIds.every((id, index) => id === cachedTrackIds[index]);
+		}
+		static async fetchPlaylistItems(playlistUri, shouldContinue = () => true) {
+			let allTracks = [];
+			let offset = 0;
+			const limit = 200;
+			let hasMore = true;
+			while (hasMore) {
+				if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
+				const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, {
+					offset,
+					limit
+				}).catch(() => null);
+				if (!contents?.items?.length) {
+					hasMore = false;
+					break;
+				}
+				allTracks = allTracks.concat(contents.items.map((item) => item.track || item));
+				offset += limit;
+				if (contents.items.length < limit) hasMore = false;
+			}
+			return allTracks.filter((track) => track?.uri);
+		}
+		static async fetchTrackIds(playlistUri, shouldContinue = () => true) {
+			return (await Playlist.fetchPlaylistItems(playlistUri, shouldContinue)).map((track) => track.uri.split(":")[2]);
+		}
+		static async fetch(playlistId, name, shouldContinue = () => true) {
+			const playlistUri = "spotify:playlist:" + playlistId;
+			const spotifyTracks = await Playlist.fetchPlaylistItems(playlistUri, shouldContinue);
+			if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
+			const uniqueArtistsById = {};
+			spotifyTracks.forEach((track) => {
+				(track.artists || []).forEach((artist) => {
+					const id = artist.uri?.split(":")?.[2];
+					if (id && !uniqueArtistsById[id]) uniqueArtistsById[id] = {
+						id,
+						name: artist.name || null
+					};
+				});
+			});
+			const artistsById = await Artist.createMany(Object.values(uniqueArtistsById));
+			const tracksById = await BasifyTrack.createMany(spotifyTracks.map((track) => ({
+				track,
+				trackArtists: (track.artists || []).map((artist) => artistsById[artist.uri?.split(":")?.[2]]).filter(Boolean)
+			})));
+			const trackIds = spotifyTracks.map((track) => track.uri.split(":")[2]);
+			const trackCounts = {
+				blocked: 0,
+				warning: 0,
+				unknown: 0,
+				noInfo: 0
+			};
+			trackIds.forEach((trackId) => {
+				const basifyTrack = tracksById[trackId];
+				if (!basifyTrack) return;
+				const status = basifyTrack.getTrackDominantStatus();
+				if (status in trackCounts) trackCounts[status]++;
+			});
+			return {
+				id: playlistId,
+				name,
+				trackIds,
+				rating: {
+					trackCounts,
+					totalCount: trackIds.length
+				}
+			};
+		}
+	};
+	//#endregion
+	//#region src/ui/NowPlayingArtist.js
+	var NowPlayingArtistRenderer = class NowPlayingArtistRenderer {
+		static styleElementId = "basify-now-playing-artist-style";
+		static statusStyles = {
+			blocked: {
+				color: "#ff4d4d",
+				shape: "square"
+			},
+			warning: {
+				color: "#f5c542",
+				shape: "triangle"
+			},
+			approved: {
+				color: "#1ed760",
+				shape: "circle"
+			},
+			pride: {
+				color: "#4aa3df",
+				shape: "crown"
+			},
+			base: {
+				color: "#8f6cff",
+				shape: "star"
+			},
+			unknown: {
+				color: "#b3b3b3",
+				shape: "world"
+			},
+			noInfo: {
+				color: "#8a8a8a",
+				shape: "world"
+			}
+		};
+		static statusIcons = {
+			crown: crownSvg,
+			star: starSvg,
+			world: unknownSvg
+		};
+		static render(basifyTrack, artistSpans) {
+			const settings = LocalStorageManager.getSettings();
+			NowPlayingArtistRenderer.injectStyles();
+			NowPlayingArtistRenderer.renderArtistSpanGroup(artistSpans.bottomBarArtistSpans, basifyTrack.artists, settings);
+			NowPlayingArtistRenderer.renderArtistSpanGroup(artistSpans.sideViewArtistSpans, basifyTrack.artists, settings);
+		}
+		static renderArtistSpanGroup(artistSpansById, artists, settings) {
+			Object.entries(artistSpansById).forEach(([artistId, artistSpan]) => {
+				const artist = artists.find((trackArtist) => trackArtist.id === artistId);
+				NowPlayingArtistRenderer.resetArtistSpan(artistSpan);
+				if (!artist) return;
+				const dominantLabel = artist.getDominantLabel();
+				const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
+				const artistLink = artistSpan.querySelector("a") || artistSpan;
+				if (settings.formatNowPlayingArtistName && statusStyle?.color) {
+					artistLink.classList.add("basify-now-playing-artist-name");
+					artistLink.style.setProperty("--basify-artist-status-color", statusStyle.color);
+				}
+				if (settings.showNowPlayingArtistStatusShape && statusStyle) artistSpan.appendChild(NowPlayingArtistRenderer.createStatusShape(dominantLabel));
+				if (settings.showNowPlayingArtistFlags && artist.countries.length) artist.countries.forEach((country) => {
+					const flagElement = country.flagImg(settings.emojiFlags, 4, 12, 16);
+					flagElement.classList.add("basify-artist-flag");
+					artistSpan.appendChild(flagElement);
+				});
+			});
+		}
+		static resetArtistSpan(artistSpan) {
+			artistSpan.querySelectorAll(".basify-artist-flag").forEach((flag) => flag.remove());
+			artistSpan.querySelectorAll(".basify-artist-status-shape").forEach((shape) => shape.remove());
+			const artistLink = artistSpan.querySelector("a") || artistSpan;
+			artistLink.classList.remove("basify-now-playing-artist-name");
+			artistLink.style.removeProperty("--basify-artist-status-color");
+		}
+		static createStatusShape(label) {
+			const statusStyle = NowPlayingArtistRenderer.statusStyles[label] || NowPlayingArtistRenderer.statusStyles.noInfo;
+			const shape = document.createElement("span");
+			shape.classList.add("basify-artist-status-shape");
+			shape.dataset.status = label;
+			shape.dataset.shape = statusStyle.shape;
+			shape.style.setProperty("--basify-artist-status-color", statusStyle.color);
+			const iconSvg = NowPlayingArtistRenderer.statusIcons[statusStyle.shape];
+			if (iconSvg) shape.innerHTML = iconSvg;
+			return shape;
+		}
+		static injectStyles() {
+			if (document.getElementById(NowPlayingArtistRenderer.styleElementId)) return;
+			const style = document.createElement("style");
+			style.id = NowPlayingArtistRenderer.styleElementId;
+			style.textContent = `
+      .basify-now-playing-artist-name { color: var(--basify-artist-status-color) !important; }
+      .basify-artist-flag { margin-bottom: 2px; }
+      .basify-artist-status-shape { display: inline-block; margin-left: 4px; vertical-align: middle; flex: 0 0 auto; }
+      .basify-artist-status-shape[data-shape="square"] { width: 10px; height: 10px; border-radius: 2px; background: var(--basify-artist-status-color); }
+      .basify-artist-status-shape[data-shape="circle"] { width: 10px; height: 10px; border-radius: 50%; background: var(--basify-artist-status-color); margin-bottom: 3px; }
+      .basify-artist-status-shape[data-shape="triangle"] { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid var(--basify-artist-status-color); margin-bottom: 4px; }
+      .basify-artist-status-shape[data-shape="crown"], .basify-artist-status-shape[data-shape="star"], .basify-artist-status-shape[data-shape="world"] { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; color: var(--basify-artist-status-color); margin-bottom: 2px; }
+      .basify-artist-status-shape[data-shape="crown"] svg, .basify-artist-status-shape[data-shape="star"] svg, .basify-artist-status-shape[data-shape="world"] svg { width: 14px; height: 14px; margin-left: 0 !important; }
+    `;
+			document.head.appendChild(style);
+		}
+	};
+	//#endregion
+	//#region src/ui/PlaylistView.js
+	var PlaylistViewRenderer = class PlaylistViewRenderer {
+		static styleElementId = "basify-playlist-view-style";
+		static observer = null;
+		static eventsRegistered = false;
+		static inFlightPlaylists = /* @__PURE__ */ new Map();
+		static currentPlaylist = null;
+		static start() {
+			PlaylistViewRenderer.injectStyles();
+			NowPlayingArtistRenderer.injectStyles();
+			PlaylistViewRenderer.registerGlobalInterceptors();
+			if (PlaylistViewRenderer.observer) PlaylistViewRenderer.observer.disconnect();
+			PlaylistViewRenderer.observer = new MutationObserver(() => {
+				PlaylistViewRenderer.scanRows();
+			});
+			const mainView = document.querySelector(".main-view-container");
+			if (mainView) {
+				PlaylistViewRenderer.observer.observe(mainView, {
+					childList: true,
+					subtree: true
+				});
+				PlaylistViewRenderer.scanRows();
+			}
+		}
+		static stop() {
+			if (PlaylistViewRenderer.observer) {
+				PlaylistViewRenderer.observer.disconnect();
+				PlaylistViewRenderer.observer = null;
+			}
+			PlaylistViewRenderer.currentPlaylist = null;
+		}
+		static registerGlobalInterceptors() {
+			if (PlaylistViewRenderer.eventsRegistered) return;
+			PlaylistViewRenderer.eventsRegistered = true;
+			document.addEventListener("dblclick", (e) => {
+				if (!LocalStorageManager.getSettings().skipEnabled) return;
+				const row = e.target.closest(".basify-blocked-row");
+				if (row) {
+					e.stopPropagation();
+					e.preventDefault();
+					PlaylistViewRenderer.showBlockedPopup(row);
+				}
+			}, true);
+			document.addEventListener("click", (e) => {
+				if (!LocalStorageManager.getSettings().skipEnabled) return;
+				const row = e.target.closest(".basify-blocked-row");
+				if (!row) return;
+				const playButton = e.target.closest("button[aria-label*=\"Play\"], button[aria-label*=\"play\"]");
+				const indexCell = e.target.closest(".main-trackList-rowSectionIndex");
+				if (playButton || indexCell) {
+					e.stopPropagation();
+					e.preventDefault();
+					PlaylistViewRenderer.showBlockedPopup(row);
+				}
+			}, true);
+		}
+		static isPlaylistPageActive(playlistId) {
+			const pathParts = Spicetify.Platform.History.location.pathname.split("/");
+			return pathParts[1] === "playlist" && pathParts[2] === playlistId;
+		}
+		static apply(headerElement, playlistId) {
+			const settings = LocalStorageManager.getSettings();
+			document.getElementById("basify-playlist-rating-card")?.remove();
+			document.getElementById("basify-playlist-rating-skeleton")?.remove();
+			if (!settings.showPlaylistRating) return;
+			PlaylistViewRenderer.injectStyles();
+			PlaylistViewRenderer.renderSkeleton(headerElement);
+			let loadPromise = PlaylistViewRenderer.inFlightPlaylists.get(playlistId);
+			if (!loadPromise) {
+				loadPromise = Playlist.create(playlistId, () => PlaylistViewRenderer.isPlaylistPageActive(playlistId)).finally(() => PlaylistViewRenderer.inFlightPlaylists.delete(playlistId));
+				PlaylistViewRenderer.inFlightPlaylists.set(playlistId, loadPromise);
+			}
+			loadPromise.then((playlist) => {
+				if (!PlaylistViewRenderer.isPlaylistPageActive(playlistId)) return;
+				PlaylistViewRenderer.currentPlaylist = playlist;
+				document.getElementById("basify-playlist-rating-skeleton")?.remove();
+				PlaylistViewRenderer.renderRatingCard(headerElement, playlist);
+				PlaylistViewRenderer.rescanRows();
+			}).catch(() => {
+				document.getElementById("basify-playlist-rating-skeleton")?.remove();
+			});
+		}
+		static renderSkeleton(headerElement) {
+			const skeleton = document.createElement("div");
+			skeleton.id = "basify-playlist-rating-skeleton";
+			skeleton.className = "basify-playlist-rating-skeleton";
+			skeleton.innerHTML = `
+      <div class="basify-skeleton-gauge"></div>
+      <div class="basify-skeleton-text">
+        <div class="basify-skeleton-line" style="width: 120px;"></div>
+        <div class="basify-skeleton-line" style="width: 180px;"></div>
+      </div>
+    `;
+			headerElement.appendChild(skeleton);
+			return skeleton;
+		}
+		static animateCounter(element, targetValue, durationMs = 800) {
+			const startTime = performance.now();
+			const startValue = 0;
+			function update(currentTime) {
+				const elapsedTime = currentTime - startTime;
+				if (elapsedTime >= durationMs) {
+					element.textContent = `${targetValue}%`;
+					return;
+				}
+				const progress = elapsedTime / durationMs;
+				const easeProgress = progress * (2 - progress);
+				element.textContent = `${Math.round(startValue + easeProgress * (targetValue - startValue))}%`;
+				requestAnimationFrame(update);
+			}
+			requestAnimationFrame(update);
+		}
+		static computeRatingDisplay(rating) {
+			if (rating?.trackCounts) {
+				const { trackCounts, totalCount } = rating;
+				const s = LocalStorageManager.getSettings();
+				let blockedCount = 0;
+				if (s.skipBlockedArtists) blockedCount += trackCounts.blocked || 0;
+				if (s.skipWarningArtists) blockedCount += trackCounts.warning || 0;
+				if (s.skipUnknownArtists) blockedCount += trackCounts.unknown || 0;
+				const percentage = totalCount > 0 ? Math.round(blockedCount / totalCount * 100) : 0;
+				return {
+					blockedCount,
+					totalCount,
+					percentage
+				};
+			}
+			return {
+				blockedCount: rating?.blockedCount || 0,
+				totalCount: rating?.totalCount || 0,
+				percentage: rating?.percentage || 0
+			};
+		}
+		static renderRatingCard(headerElement, playlist) {
+			if (!playlist.rating) return;
+			const { percentage, blockedCount, totalCount } = PlaylistViewRenderer.computeRatingDisplay(playlist.rating);
+			document.getElementById("basify-playlist-rating-card")?.remove();
+			const card = document.createElement("div");
+			card.id = "basify-playlist-rating-card";
+			card.className = "basify-playlist-rating-card";
+			const dashArray = 126;
+			const dashOffset = dashArray - percentage / 100 * dashArray;
+			let strokeColor = "#1ed760";
+			if (percentage > 9) strokeColor = "#f5c542";
+			if (percentage > 29) strokeColor = "#ff4d4d";
+			const locale = LocalStorageManager.getSettings().locale;
+			const ratingText = locale === "uk" ? "Рейтинг безпеки" : "Safety Rating";
+			const subText = locale === "uk" ? `${blockedCount} з ${totalCount} треків заблоковано` : `${blockedCount} of ${totalCount} tracks blocked`;
+			card.innerHTML = `
+      <div class="basify-gauge-wrapper">
+        <svg viewBox="0 0 100 55" width="100" height="55">
+          <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10" stroke-linecap="round" />
+          <path class="basify-gauge-fill" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="${strokeColor}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${dashArray}" stroke-dashoffset="${dashArray}" />
+        </svg>
+        <div class="basify-gauge-percentage">0%</div>
+      </div>
+      <div class="basify-rating-text-container">
+        <div class="basify-rating-title">${ratingText}</div>
+        <div class="basify-rating-subtext">${subText}</div>
+      </div>
+    `;
+			headerElement.appendChild(card);
+			requestAnimationFrame(() => {
+				const fillPath = card.querySelector(".basify-gauge-fill");
+				const percentageText = card.querySelector(".basify-gauge-percentage");
+				if (fillPath && percentageText) {
+					fillPath.style.strokeDashoffset = String(dashOffset);
+					PlaylistViewRenderer.animateCounter(percentageText, percentage, 800);
+				}
+			});
+		}
+		static async scanRows() {
+			const trackListContainer = document.querySelector("div.main-trackList-trackListContainer");
+			if (!trackListContainer) return;
+			const rows = trackListContainer.querySelectorAll("div[role=\"row\"]");
+			const settings = LocalStorageManager.getSettings();
+			const candidates = [];
+			const uniqueArtistsById = {};
+			rows.forEach((row) => {
+				const artistLinks = row.querySelectorAll("a[href^=\"/artist/\"]");
+				if (!artistLinks.length) return;
+				const artistIds = Array.from(artistLinks).map((link) => link.pathname.split("/")[2]);
+				const artistIdsString = artistIds.join(",");
+				if (row.dataset.basifyProcessed === artistIdsString) return;
+				row.dataset.basifyProcessed = artistIdsString;
+				row.classList.remove("basify-blocked-row");
+				delete row.dataset.basifyBlockReasons;
+				row.querySelectorAll(".basify-playlist-status-icon-wrapper").forEach((el) => {
+					el.removeEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
+					el.removeEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
+					el.remove();
+				});
+				artistLinks.forEach((link) => {
+					link.classList.remove("basify-now-playing-artist-name");
+					link.style.removeProperty("--basify-artist-status-color");
+				});
+				artistIds.forEach((id) => {
+					if (!uniqueArtistsById[id]) uniqueArtistsById[id] = {
+						id,
+						name: null
+					};
+				});
+				candidates.push({
+					row,
+					artistLinks,
+					artistIds
+				});
+			});
+			if (!candidates.length) return;
+			let artistsById;
+			try {
+				artistsById = await Artist.createMany(Object.values(uniqueArtistsById));
+			} catch (e) {
+				candidates.forEach(({ row }) => row.removeAttribute("data-basify-processed"));
+				return;
+			}
+			const playlist = PlaylistViewRenderer.currentPlaylist;
+			const pathParts = Spicetify.Platform.History.location.pathname.split("/");
+			const trackIds = pathParts[1] === "playlist" && playlist?.id === pathParts[2] ? playlist.trackIds : null;
+			candidates.forEach(({ row, artistLinks, artistIds }) => {
+				let shouldSkipRow = false;
+				const blockReasons = [];
+				artistIds.forEach((id, index) => {
+					const artist = artistsById[id];
+					const link = artistLinks[index];
+					if (!link || !artist) return;
+					const dominantLabel = artist.getDominantLabel();
+					const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
+					if (settings.formatNowPlayingArtistName && statusStyle?.color) {
+						link.classList.add("basify-now-playing-artist-name");
+						link.style.setProperty("--basify-artist-status-color", statusStyle.color);
+					}
+					if (dominantLabel === "blocked" || dominantLabel === "warning" || dominantLabel === "unknown") blockReasons.push({
+						type: "artist",
+						label: dominantLabel,
+						name: artist.name,
+						description: artist.descriptionEn,
+						descriptionUk: artist.description
+					});
+					if (settings.showNowPlayingArtistStatusShape) {
+						const wrapper = document.createElement("span");
+						wrapper.className = "basify-playlist-status-icon-wrapper";
+						const badgeConfig = ArtistInfoSectionRenderer.badges[dominantLabel] || ArtistInfoSectionRenderer.badges.noInfo;
+						const locale = LocalStorageManager.getSettings().locale;
+						const labelText = BasifyI18n.t(badgeConfig.textKey);
+						const description = locale === "uk" ? artist.description : artist.descriptionEn;
+						let tooltipText = `${labelText} (${artist.name})`;
+						if (description) tooltipText += ` - ${description}`;
+						wrapper.dataset.tooltipText = tooltipText;
+						wrapper.appendChild(NowPlayingArtistRenderer.createStatusShape(dominantLabel));
+						wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
+						wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
+						link.parentNode.insertBefore(wrapper, link.nextSibling);
+					}
+					if (dominantLabel === "blocked" && settings.skipBlockedArtists || dominantLabel === "warning" && settings.skipWarningArtists || dominantLabel === "unknown" && settings.skipUnknownArtists) shouldSkipRow = true;
+				});
+				let trackBlocked = false;
+				if (trackIds) {
+					const trackIndex = Number(row.getAttribute("aria-rowindex")) - 2;
+					const trackId = trackIndex >= 0 ? trackIds[trackIndex] : null;
+					const trackData = trackId ? LocalStorageManager.getTrack(trackId) : null;
+					if (trackData) {
+						const blockedDistributors = new BasifyTrack(trackData).getBlockedDistributors();
+						if (blockedDistributors.length > 0) {
+							trackBlocked = true;
+							blockReasons.push({
+								type: "distributor",
+								names: blockedDistributors
+							});
+							if (settings.showNowPlayingArtistStatusShape) {
+								const albumLink = row.querySelector("[aria-colindex=\"3\"] a[href^=\"/album/\"]");
+								if (albumLink) {
+									const wrapper = document.createElement("span");
+									wrapper.className = "basify-playlist-status-icon-wrapper";
+									wrapper.appendChild(NowPlayingArtistRenderer.createStatusShape("blocked"));
+									const locale = LocalStorageManager.getSettings().locale;
+									wrapper.dataset.tooltipText = `${BasifyI18n.t("trust.blockedDistributor", locale)}: ${blockedDistributors.join(", ")}`;
+									wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
+									wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
+									const albumSpan = albumLink.parentNode;
+									albumSpan.style.setProperty("margin-inline-end", "0px", "important");
+									albumSpan.parentNode.insertBefore(wrapper, albumSpan.nextSibling);
+								}
+							}
+						}
+					}
+				}
+				if (blockReasons.length) row.dataset.basifyBlockReasons = JSON.stringify(blockReasons);
+				if ((shouldSkipRow || trackBlocked) && settings.skipEnabled) row.classList.add("basify-blocked-row");
+			});
+		}
+		static rescanRows() {
+			document.querySelectorAll("[data-basify-processed]").forEach((el) => el.removeAttribute("data-basify-processed"));
+			PlaylistViewRenderer.scanRows();
+		}
+		static updateRatingCard() {
+			const playlist = PlaylistViewRenderer.currentPlaylist;
+			if (!playlist?.rating) return;
+			const card = document.getElementById("basify-playlist-rating-card");
+			if (!card) return;
+			const { percentage, blockedCount, totalCount } = PlaylistViewRenderer.computeRatingDisplay(playlist.rating);
+			const dashArray = 126;
+			const dashOffset = dashArray - percentage / 100 * dashArray;
+			let strokeColor = "#1ed760";
+			if (percentage > 9) strokeColor = "#f5c542";
+			if (percentage > 29) strokeColor = "#ff4d4d";
+			const fillPath = card.querySelector(".basify-gauge-fill");
+			if (fillPath) {
+				fillPath.setAttribute("stroke", strokeColor);
+				fillPath.style.strokeDashoffset = String(dashOffset);
+			}
+			const pct = card.querySelector(".basify-gauge-percentage");
+			if (pct) pct.textContent = `${percentage}%`;
+			const isUk = LocalStorageManager.getSettings().locale === "uk";
+			const title = card.querySelector(".basify-rating-title");
+			const sub = card.querySelector(".basify-rating-subtext");
+			if (title) title.textContent = isUk ? "Рейтинг безпеки" : "Safety Rating";
+			if (sub) sub.textContent = isUk ? `${blockedCount} з ${totalCount} треків заблоковано` : `${blockedCount} of ${totalCount} tracks blocked`;
+		}
+		static recalculateRating() {
+			PlaylistViewRenderer.updateRatingCard();
+		}
+		static showBlockedPopup(row) {
+			const reasons = JSON.parse(row.dataset.basifyBlockReasons || "[]");
+			if (!reasons.length) return;
+			const settings = LocalStorageManager.getSettings();
+			const locale = settings.locale;
+			const isUk = locale === "uk";
+			const skipLabelSettings = {
+				blocked: settings.skipBlockedArtists,
+				warning: settings.skipWarningArtists,
+				unknown: settings.skipUnknownArtists
+			};
+			const relevantReasons = reasons.filter((r) => {
+				if (r.type === "distributor") return settings.skipBlockedArtists;
+				return !!skipLabelSettings[r.label];
+			});
+			if (!relevantReasons.length) return;
+			const parts = relevantReasons.map((r) => {
+				if (r.type === "artist") {
+					const badgeConfig = ArtistInfoSectionRenderer.badges[r.label];
+					const label = BasifyI18n.t(badgeConfig?.textKey || "trust.noInfo", locale);
+					return `${r.name} — ${label}`;
+				}
+				return `${BasifyI18n.t("trust.blockedDistributor", locale)}: ${r.names.join(", ")}`;
+			});
+			const title = isUk ? "Трек заблоковано" : "Track blocked";
+			Spicetify.showNotification(`${title}: ${parts.join(" | ")}`, false, 4e3);
+		}
+		static showTooltip(event) {
+			const wrapper = event.currentTarget;
+			const text = wrapper.dataset.tooltipText;
+			if (!text) return;
+			let tooltip = document.getElementById("basify-global-tooltip");
+			if (!tooltip) {
+				tooltip = document.createElement("div");
+				tooltip.id = "basify-global-tooltip";
+				tooltip.className = "basify-global-tooltip";
+				document.body.appendChild(tooltip);
+			}
+			tooltip.textContent = text;
+			const rect = wrapper.getBoundingClientRect();
+			tooltip.style.left = `${rect.left + rect.width / 2}px`;
+			tooltip.style.top = `${rect.top - 6}px`;
+			tooltip.classList.add("is-visible");
+		}
+		static hideTooltip() {
+			const tooltip = document.getElementById("basify-global-tooltip");
+			if (tooltip) tooltip.classList.remove("is-visible");
+		}
+		static injectStyles() {
+			if (document.getElementById(PlaylistViewRenderer.styleElementId)) return;
+			const style = document.createElement("style");
+			style.id = PlaylistViewRenderer.styleElementId;
+			style.textContent = `
+      .basify-blocked-row {
+        opacity: 0.35;
+        background: rgba(114, 52, 51, 0.05) !important;
+        transition: opacity 0.2s ease;
+      }
+      .basify-blocked-row:hover {
+        opacity: 0.75;
+      }
+      .basify-playlist-status-icon-wrapper {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        vertical-align: middle;
+        margin-left: 4px;
+      }
+      .basify-playlist-status-icon svg {
+        display: block;
+      }
+      .basify-global-tooltip {
+        position: fixed;
+        transform: translate(-50%, -100%) scale(0.95);
+        background: #282828;
+        color: #ffffff;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        max-width: 320px;
+        white-space: normal;
+        line-height: 1.4;
+        text-align: center;
+        word-wrap: break-word;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        z-index: 999999 !important;
+        pointer-events: none;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition: opacity 0.1s cubic-bezier(0.4, 0, 0.2, 1), transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .basify-global-tooltip.is-visible {
+        opacity: 1;
+        transform: translate(-50%, -100%) scale(1);
+      }
+      .basify-playlist-rating-card {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 16px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        width: fit-content;
+      }
+      .basify-gauge-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100px;
+        height: 55px;
+      }
+      .basify-gauge-fill {
+        transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .basify-gauge-percentage {
+        position: absolute;
+        bottom: 2px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 15px;
+        font-weight: 800;
+        color: #ffffff;
+      }
+      .basify-rating-text-container {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .basify-rating-title {
+        font-size: 12px;
+        font-weight: 800;
+        color: #ffffff;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .basify-playlist-rating-card .basify-rating-title {
+        color: #ffffff !important;
+      }
+      .basify-rating-subtext {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--spice-subtext);
+      }
+      .basify-playlist-rating-skeleton {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-top: 16px;
+        padding: 10px 16px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        width: fit-content;
+      }
+      .basify-skeleton-gauge {
+        width: 100px;
+        height: 55px;
+        border-radius: 8px;
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.06) 25%,
+          rgba(255, 255, 255, 0.12) 50%,
+          rgba(255, 255, 255, 0.06) 75%
+        );
+        background-size: 200% 100%;
+        animation: basify-skeleton-shimmer 1.4s ease infinite;
+      }
+      .basify-skeleton-text {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .basify-skeleton-line {
+        height: 12px;
+        border-radius: 4px;
+        background: linear-gradient(
+          90deg,
+          rgba(255, 255, 255, 0.06) 25%,
+          rgba(255, 255, 255, 0.12) 50%,
+          rgba(255, 255, 255, 0.06) 75%
+        );
+        background-size: 200% 100%;
+        animation: basify-skeleton-shimmer 1.4s ease infinite;
+      }
+      @keyframes basify-skeleton-shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+    `;
+			document.head.appendChild(style);
+		}
+	};
+	//#endregion
 	//#region src/ui/SettingsMenu.js
 	Spicetify.React;
 	var SettingsMenu = class SettingsMenu {
@@ -1000,7 +2318,10 @@ var Basify = (function(exports) {
 			const emojiFlagsChanged = Object.hasOwn(changedSettings, "emojiFlags");
 			const localeChanged = Object.hasOwn(changedSettings, "locale");
 			SkipToastRenderer.applySettings(settings, changedSettings);
-			if (localeChanged) SettingsMenu.updateLocalizedTitles(settings.locale);
+			if (localeChanged) {
+				SettingsMenu.updateLocalizedTitles(settings.locale);
+				PlaylistViewRenderer.updateRatingCard();
+			}
 			const track = NowPlayingRuntimeState.track;
 			if (Object.hasOwn(changedSettings, "formatNowPlayingBar") || Object.hasOwn(changedSettings, "formatNowPlayingArtistName") || Object.hasOwn(changedSettings, "showNowPlayingArtistStatusShape") || Object.hasOwn(changedSettings, "showNowPlayingArtistFlags") || emojiFlagsChanged) {
 				const artistSpans = NowPlayingRuntimeState.artistSpans;
@@ -1011,8 +2332,10 @@ var Basify = (function(exports) {
 			if (emojiFlagsChanged || localeChanged) refreshCurrentArtistPage().catch((error) => {
 				console.warn("Basify failed to refresh artist page:", error);
 			});
-			if (!(Object.hasOwn(changedSettings, "skipEnabled") || Object.hasOwn(changedSettings, "skipBlockedArtists") || Object.hasOwn(changedSettings, "skipWarningArtists") || Object.hasOwn(changedSettings, "skipUnknownArtists")) || !track) return;
-			skipTrackIfNeeded(track);
+			const skipSettingsChanged = Object.hasOwn(changedSettings, "skipEnabled") || Object.hasOwn(changedSettings, "skipBlockedArtists") || Object.hasOwn(changedSettings, "skipWarningArtists") || Object.hasOwn(changedSettings, "skipUnknownArtists");
+			if (localeChanged || Object.hasOwn(changedSettings, "formatNowPlayingArtistName") || Object.hasOwn(changedSettings, "showNowPlayingArtistStatusShape") || skipSettingsChanged) PlaylistViewRenderer.rescanRows();
+			if (skipSettingsChanged) PlaylistViewRenderer.recalculateRating();
+			if (skipSettingsChanged && track) skipTrackIfNeeded(track);
 		}
 		static Component() {
 			const React = Spicetify.React;
@@ -1329,664 +2652,6 @@ var Basify = (function(exports) {
 		}
 	};
 	//#endregion
-	//#region src/models/Country.js
-	var Country = class Country {
-		constructor(countryCode = null) {
-			this.countryCode = countryCode.toLowerCase();
-		}
-		flagImg(useEmojiFlag = true, marginLeft = 0, height = 12, width = 16) {
-			const img = document.createElement("img");
-			img.src = useEmojiFlag ? `https://flagcdn.com/${width}x${height}/${this.countryCode}.png` : `https://flagcdn.com/h${Country.getClosestFlagHeight(height)}/${this.countryCode}.png`;
-			img.alt = this.countryCode;
-			img.style.marginLeft = `${marginLeft}px`;
-			img.style.verticalAlign = "middle";
-			img.style.width = `${width}px`;
-			img.style.height = `${height}px`;
-			return img;
-		}
-		static getClosestFlagHeight(height) {
-			return [
-				20,
-				24,
-				40,
-				60,
-				80,
-				120,
-				240
-			].reduce((closestHeight, currentHeight) => {
-				const closestDifference = Math.abs(closestHeight - height);
-				return Math.abs(currentHeight - height) < closestDifference ? currentHeight : closestHeight;
-			});
-		}
-	};
-	//#endregion
-	//#region src/models/Artist.js
-	var Artist = class Artist {
-		static baseArtistURL = "open.spotify.com/artist/";
-		static apiURL = "https://api.phonkersbase.com/api/v1/artist/all?search=";
-		static cacheMaxAgeMs = 1440 * 60 * 1e3;
-		static isCacheStale(artistData) {
-			return !artistData?.updatedAt || Date.now() - artistData.updatedAt > Artist.cacheMaxAgeMs;
-		}
-		constructor(data) {
-			this.id = data.id;
-			this.name = data.name;
-			this.url = data.url;
-			this.description = data.description || null;
-			this.descriptionEn = data.descriptionEn || null;
-			this.countries = (data.countries || []).map((country) => new Country(country.countryCode));
-			this.labels = data.labels || [];
-			this.updatedAt = data.updatedAt || Date.now();
-			this.lastUsedAt = data.lastUsedAt || Date.now();
-		}
-		static async create(artistId, fallbackName = null) {
-			const cachedArtistData = LocalStorageManager.getArtist(artistId);
-			if (cachedArtistData && !Artist.isCacheStale(cachedArtistData)) {
-				console.log("Loading artist from local storage", artistId);
-				if (!cachedArtistData.name && fallbackName) cachedArtistData.name = fallbackName;
-				return new Artist(await LocalStorageManager.markArtistUsed(artistId) || cachedArtistData);
-			}
-			if (cachedArtistData && Artist.isCacheStale(cachedArtistData)) console.log("Artist information from local storage is expired", artistId);
-			const fetchedArtistData = await Artist.fetch(artistId, fallbackName);
-			return new Artist(await LocalStorageManager.saveArtist(fetchedArtistData));
-		}
-		static async fetch(artistId, fallbackName = null) {
-			Artist.baseArtistURL + artistId;
-			const requestURL = Artist.apiURL + encodeURIComponent(artistId);
-			console.log("Requesting artist from db", artistId);
-			try {
-				const responseData = await fetch(requestURL, {
-					method: "GET",
-					headers: { Accept: "application/json" }
-				});
-				const artistItem = JSON.parse(await responseData.text()).items[0];
-				if (!artistItem) return Artist.createFallbackArtistData(artistId, fallbackName);
-				return Artist.fromApiArtistItem(artistItem, artistId, fallbackName);
-			} catch (e) {
-				return Artist.createFallbackArtistData(artistId, fallbackName);
-			}
-		}
-		static async createMany(artistsData) {
-			const artistsById = {};
-			const missingArtists = [];
-			artistsData.forEach(({ id, name }) => {
-				if (!id) return;
-				const cachedArtistData = LocalStorageManager.getArtist(id);
-				if (cachedArtistData && !Artist.isCacheStale(cachedArtistData)) {
-					if (!cachedArtistData.name && name) cachedArtistData.name = name;
-					artistsById[id] = new Artist(cachedArtistData);
-					LocalStorageManager.markArtistUsed(id).catch(() => {});
-					return;
-				}
-				missingArtists.push({
-					id,
-					name: name || null
-				});
-			});
-			if (!missingArtists.length) return artistsById;
-			const fetchedArtistsData = await Artist.fetchMany(missingArtists);
-			(await LocalStorageManager.saveArtist(fetchedArtistsData)).forEach((artistData) => {
-				artistsById[artistData.id] = new Artist(artistData);
-			});
-			return artistsById;
-		}
-		static async fetchMany(artistsData) {
-			const artistIds = artistsData.map((artist) => artist.id);
-			const requestURL = Artist.apiURL + encodeURIComponent(artistIds.join(","));
-			console.log("[Basify] Requesting artists from db:", artistIds);
-			try {
-				const responseData = await fetch(requestURL, {
-					method: "GET",
-					headers: { Accept: "application/json" }
-				});
-				const artistItems = JSON.parse(await responseData.text()).items || [];
-				const artistsBySpotifyId = {};
-				artistItems.forEach((artistItem) => {
-					if (!artistItem.spotifyId) return;
-					artistsBySpotifyId[artistItem.spotifyId] = artistItem;
-				});
-				return artistsData.map(({ id, name }) => {
-					const artistItem = artistsBySpotifyId[id];
-					if (!artistItem) return Artist.createFallbackArtistData(id, name);
-					return Artist.fromApiArtistItem(artistItem, id, name);
-				});
-			} catch (e) {
-				return artistsData.map(({ id, name }) => Artist.createFallbackArtistData(id, name));
-			}
-		}
-		static fromApiArtistItem(artistItem, artistId, fallbackName = null) {
-			const spotifyId = artistItem.spotifyId || artistId;
-			const artistURL = Artist.baseArtistURL + spotifyId;
-			return {
-				id: spotifyId,
-				name: artistItem.name || fallbackName,
-				url: artistURL,
-				description: artistItem.description || null,
-				descriptionEn: artistItem.descriptionEn || null,
-				countries: (artistItem.countries || []).map((countryData) => new Country(countryData.code)),
-				labels: (artistItem.listenLabels || []).map((labelData) => labelData.name)
-			};
-		}
-		static createFallbackArtistData(artistId, fallbackName = null) {
-			return {
-				id: artistId,
-				name: fallbackName,
-				url: Artist.baseArtistURL + artistId,
-				countries: [],
-				labels: [],
-				description: null,
-				descriptionEn: null
-			};
-		}
-	};
-	//#endregion
-	//#region src/utils/domObserver.js
-	var DomObserver = class DomObserver {
-		static async waitUntil(conditionCallback, timeoutMs = 5e3, intervalMs = 100) {
-			const startTime = Date.now();
-			return new Promise((resolve, reject) => {
-				const intervalId = setInterval(() => {
-					try {
-						const result = conditionCallback();
-						if (result) {
-							clearInterval(intervalId);
-							resolve(result);
-							return;
-						}
-						if (Date.now() - startTime >= timeoutMs) {
-							clearInterval(intervalId);
-							reject(/* @__PURE__ */ new Error("Basify waitUntil timed out"));
-						}
-					} catch (error) {
-						clearInterval(intervalId);
-						reject(error);
-					}
-				}, intervalMs);
-			});
-		}
-		static async waitForElement(selector, timeoutMs = 5e3) {
-			return DomObserver.waitUntil(() => document.querySelector(selector), timeoutMs);
-		}
-		static async waitForNowPlayingArtistSpans(track, timeoutMs = 5e3) {
-			return DomObserver.waitUntil(() => {
-				const bottomBarArtistsContainer = document.querySelector("div.Root__now-playing-bar div.main-nowPlayingBar-left div.main-trackInfo-artists span.OINH5zA0pQyzffwo");
-				const sideViewArtistsContainer = document.querySelector("div.Root__right-sidebar div.main-nowPlayingView-nowPlayingWidget div.main-trackInfo-artists span.OINH5zA0pQyzffwo");
-				if (!bottomBarArtistsContainer) return null;
-				const trackArtistIds = (track?.artists || []).map((artist) => artist.uri.split(":")[2]);
-				const bottomBarArtistSpansById = DomObserver.extractArtistDataFromContainer(bottomBarArtistsContainer);
-				if (!DomObserver.haveSameArtistIds(Object.keys(bottomBarArtistSpansById), trackArtistIds)) return null;
-				let sideViewArtistSpansById = {};
-				if (sideViewArtistsContainer) {
-					sideViewArtistSpansById = DomObserver.extractArtistDataFromContainer(sideViewArtistsContainer);
-					if (!DomObserver.haveSameArtistIds(Object.keys(sideViewArtistSpansById), trackArtistIds)) return null;
-				}
-				return {
-					bottomBarArtistSpans: bottomBarArtistSpansById,
-					sideViewArtistSpans: sideViewArtistSpansById
-				};
-			}, timeoutMs);
-		}
-		static extractArtistDataFromContainer(artistsContainer) {
-			const artistLinks = Array.from(artistsContainer.querySelectorAll("a"));
-			const artistSpansById = {};
-			artistLinks.forEach((artistLink) => {
-				const artistId = artistLink.href.split("/").pop();
-				const artistSpan = artistLink.closest("span");
-				if (!artistId || !artistSpan) return;
-				artistSpansById[artistId] = artistSpan;
-			});
-			return artistSpansById;
-		}
-		static haveSameArtistIds(firstArtistIds, secondArtistIds) {
-			if (firstArtistIds.length !== secondArtistIds.length) return false;
-			const sortedFirstArtistIds = [...firstArtistIds].sort();
-			const sortedSecondArtistIds = [...secondArtistIds].sort();
-			return sortedFirstArtistIds.every((artistId, index) => artistId === sortedSecondArtistIds[index]);
-		}
-		static async waitForArtistPageHeaderElement(artistId, timeoutMs = 5e3) {
-			return DomObserver.waitUntil(() => {
-				const headerTitleElement = document.querySelector(".main-entityHeader-container.main-entityHeader-containerFlex");
-				if (!headerTitleElement) return null;
-				if (Spicetify.Platform.History.location.pathname.split("/")[2] !== artistId) return null;
-				return headerTitleElement;
-			}, timeoutMs);
-		}
-	};
-	//#endregion
-	//#region src/constants/distributors.js
-	var BLOCKED_DISTRIBUTORS = [
-		"0TO8",
-		"88 CEBEP",
-		"682 MUSIC",
-		"ADVANCE",
-		"ALONE STARZ",
-		"ANARCHY RECORDS",
-		"ARCADIA",
-		"BADTRIP MUSIC",
-		"BLXCK MEDIA",
-		"BURNT PLANET MUSIC",
-		"CEPHALON",
-		"CRESTA LA CULTURA",
-		"CXLTXRY",
-		"DEAD TWENTY MEDIA",
-		"DECLIPED",
-		"DIGITAL RECORD’S MEDIA",
-		"DIRTYBLADES RECORDS",
-		"DOOM MEDIA RECORDS",
-		"ECHO8",
-		"EFFECTIVE RECORDS",
-		"EMMETT ZETTO",
-		"FRESHMAN MUSIC",
-		"GOOST MUSIC",
-		"HOBOSHRINE",
-		"HOODMAFIA",
-		"ILLUSIONE",
-		"IMMINENT",
-		"LIFESTYLE",
-		"MAVS MUSIC",
-		"MEDIAHATE MUSIC",
-		"MEMPHIS 1996",
-		"MEMPHIS CULT",
-		"MERPHI MUSIC GROUP",
-		"MIZYSQUAD",
-		"MNRC RECORDS",
-		"MOONMUZ+",
-		"NEDOSTUPNOSTЬ",
-		"NEEDLMUSIC",
-		"NYUKTA",
-		"OVERDO$E RECORDS",
-		"PANDA MUSIC",
-		"PHONK POINT",
-		"RHYMES",
-		"RPLUS",
-		"SAVAGE$TATION",
-		"STRADA MUSIC",
-		"SVOBODA",
-		"UNTITLED BURIAL",
-		"WHY Z MUSIC",
-		"YELLOW CHAIR",
-		"СТУДИЯ СОЮЗ",
-		"VOLUME100",
-		"ALLSTARS DISTRIBUTION",
-		"MUSIC ALLIGATOR",
-		"KOALA MUSIC",
-		"PHONKMEDIA",
-		"EVILEAF",
-		"СОЮЗ МЬЮЗИК",
-		"SCARED CULT",
-		"OCCULTWAVES",
-		"HARMONY HUSTLERS",
-		"COWBELLKILLAZ",
-		"CHERRY CULT",
-		"DXFO",
-		"HASLETT CULT",
-		"HATEWAVE",
-		"ZVONKO DIGITAL",
-		"YOURTUNES",
-		"SFEROOM DISTRIBUTION",
-		"ONERPM",
-		"MIN.ECO",
-		"BELIVE",
-		"EVILSET",
-		"ПЕРВОЕ МУЗЫКАЛЬНОЕ",
-		"FRESHTUNES",
-		"PLAYA POSSE",
-		"VELVET MUSIC",
-		"GAMMA MUSIC",
-		"PEPERFUNK RECORDINGS",
-		"РНБ КЛУБ",
-		"ROZETKA DIGITAL",
-		"SAIBOT Music"
-	];
-	//#endregion
-	//#region src/models/Track.js
-	var BasifyTrack = class BasifyTrack {
-		constructor(data, trackArtists = []) {
-			trackArtists = trackArtists || [];
-			this.id = data.id;
-			this.uri = data.uri;
-			this.name = data.name;
-			this.albumUri = data.albumUri || null;
-			this.imageUrl = data.imageUrl || null;
-			this.distributors = data.distributors || [];
-			this.artistIds = data.artistIds || trackArtists.map((artist) => artist.id);
-			this.artistsById = {};
-			trackArtists.forEach((artist) => {
-				this.artistsById[artist.id] = artist;
-			});
-			this.updatedAt = data.updatedAt || Date.now();
-			this.lastUsedAt = data.lastUsedAt || Date.now();
-		}
-		get artists() {
-			return Object.values(this.artistsById);
-		}
-		static async create(spotifyTrack, trackArtists = []) {
-			const trackId = spotifyTrack.uri?.split(":")?.[2] || null;
-			const cachedTrackData = trackId ? LocalStorageManager.getTrack(trackId) : null;
-			if (cachedTrackData) {
-				console.log("Loading track from local storage", trackId);
-				return new BasifyTrack(await LocalStorageManager.markTrackUsed(trackId) || cachedTrackData, trackArtists);
-			}
-			const fetchedTrackData = await BasifyTrack.fetch(spotifyTrack, trackArtists);
-			return new BasifyTrack(await LocalStorageManager.saveTrack(fetchedTrackData), trackArtists);
-		}
-		static async getTrackArtists(spotifyTrack) {
-			const artistsData = spotifyTrack?.artists || [];
-			return Promise.all(artistsData.map((a) => Artist.create(a.uri.split(":")[2], a.name)));
-		}
-		static async createFromNowPlaying(spotifyTrack) {
-			try {
-				const [trackArtists, artistSpans] = await Promise.all([BasifyTrack.getTrackArtists(spotifyTrack), DomObserver.waitForNowPlayingArtistSpans(spotifyTrack, 5e3).catch(() => null)]);
-				return {
-					basifyTrack: await BasifyTrack.create(spotifyTrack, trackArtists),
-					artistSpans
-				};
-			} catch (e) {
-				return null;
-			}
-		}
-		static async fetch(spotifyTrack, trackArtists = []) {
-			const distributors = await BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []);
-			console.log("Requesting track info from Spotify", spotifyTrack.uri.split(":")[2]);
-			return {
-				id: spotifyTrack.uri?.split(":")?.[2] || null,
-				uri: spotifyTrack.uri,
-				name: spotifyTrack.name || BasifyI18n.t("unknownTrack"),
-				albumUri: spotifyTrack.album?.uri || null,
-				imageUrl: BasifyTrack.getTrackImageUrl(spotifyTrack),
-				artistIds: trackArtists.map((artist) => artist.id),
-				distributors
-			};
-		}
-		static async createMany(items) {
-			const tracksById = {};
-			const missingItems = [];
-			items.forEach(({ track, trackArtists = [] }) => {
-				const id = track.uri?.split(":")?.[2];
-				if (!id) return;
-				const cachedTrackData = LocalStorageManager.getTrack(id);
-				if (cachedTrackData) {
-					tracksById[id] = new BasifyTrack(cachedTrackData, trackArtists);
-					LocalStorageManager.markTrackUsed(id).catch(() => {});
-					return;
-				}
-				missingItems.push({
-					track,
-					trackArtists
-				});
-			});
-			if (!missingItems.length) return tracksById;
-			const fetchedTracksData = await Promise.all(missingItems.map(({ track, trackArtists }) => BasifyTrack.fetch(track, trackArtists)));
-			(await LocalStorageManager.saveTrack(fetchedTracksData)).forEach((trackData, index) => {
-				const { trackArtists } = missingItems[index];
-				tracksById[trackData.id] = new BasifyTrack(trackData, trackArtists);
-			});
-			return tracksById;
-		}
-		static async getDistributorsFromSpotifyTrack(spotifyTrack) {
-			const albumUri = spotifyTrack?.album?.uri;
-			if (!albumUri) return [];
-			try {
-				const { getAlbum } = Spicetify.GraphQL.Definitions;
-				const album = (await Spicetify.GraphQL.Request(getAlbum, {
-					uri: albumUri,
-					locale: "",
-					offset: 0,
-					limit: 50
-				}))?.data?.albumUnion;
-				const distributorTexts = [];
-				if (album?.label) distributorTexts.push(album.label);
-				(album?.copyright?.items || []).forEach((item) => {
-					if (!item?.text) return;
-					distributorTexts.push(item.text);
-				});
-				return [...new Set(distributorTexts.filter(Boolean))];
-			} catch (error) {
-				console.warn("Basify failed to load album distributor data:", error);
-				return [];
-			}
-		}
-		getBlockedDistributors() {
-			return BLOCKED_DISTRIBUTORS.filter((blockedDistributor) => {
-				const normalizedBlockedDistributor = BasifyTrack.normalizeDistributorName(blockedDistributor);
-				return this.distributors.some((distributorText) => {
-					return BasifyTrack.normalizeDistributorName(distributorText).includes(normalizedBlockedDistributor);
-				});
-			});
-		}
-		isDistributorBlocked() {
-			return this.getBlockedDistributors().length > 0;
-		}
-		getArtistLabels(artist) {
-			return artist.labels.length ? artist.labels : ["noInfo"];
-		}
-		shouldSkipTrack() {
-			if (!LocalStorageManager.getSettings().skipEnabled) return false;
-			return this.getSkipReasons().length > 0;
-		}
-		getSkipReasons() {
-			const settings = LocalStorageManager.getSettings();
-			const reasons = [];
-			const blockedDistros = this.getBlockedDistributors();
-			if (settings.skipBlockedArtists && blockedDistros.length > 0) blockedDistros.forEach((distributor) => {
-				reasons.push({
-					type: "distributor",
-					name: distributor,
-					label: "blockedDistributor"
-				});
-			});
-			const skipLabelSettings = {
-				blocked: settings.skipBlockedArtists,
-				warning: settings.skipWarningArtists,
-				unknown: settings.skipUnknownArtists
-			};
-			this.artists.forEach((artist) => {
-				this.getArtistLabels(artist).forEach((label) => {
-					if (skipLabelSettings[label]) reasons.push({
-						type: "artist",
-						artist,
-						label
-					});
-				});
-			});
-			return reasons;
-		}
-		getTrackTheme() {
-			if (this.isDistributorBlocked()) return "blocked";
-			const labels = this.artists.flatMap((artist) => this.getArtistLabels(artist));
-			return [
-				"blocked",
-				"pride",
-				"base",
-				"approved",
-				"unknown",
-				"noInfo"
-			].find((themeStatus) => labels.includes(themeStatus)) || null;
-		}
-		async getDominantColor() {
-			if (!this.imageUrl) return null;
-			return BasifyTrack.extractDominantColorFromImage(this.imageUrl);
-		}
-		static getTrackImageUrl(spotifyTrack) {
-			const imageUri = spotifyTrack?.images?.[0]?.url || spotifyTrack?.album?.images?.[0]?.url || spotifyTrack?.metadata?.image_xlarge_url || spotifyTrack?.metadata?.image_large_url || spotifyTrack?.metadata?.image_url;
-			if (!imageUri) return null;
-			if (imageUri.startsWith("https://")) return imageUri;
-			const imageId = imageUri.split(":")?.[2];
-			if (!imageId) return null;
-			return `https://i.scdn.co/image/${imageId}`;
-		}
-		static extractDominantColorFromImage(imageUrl) {
-			return new Promise((resolve) => {
-				const image = new Image();
-				image.crossOrigin = "anonymous";
-				image.src = imageUrl;
-				image.onload = () => {
-					try {
-						const canvas = document.createElement("canvas");
-						const size = 48;
-						canvas.width = size;
-						canvas.height = size;
-						const context = canvas.getContext("2d", { willReadFrequently: true });
-						context.drawImage(image, 0, 0, size, size);
-						const pixels = context.getImageData(0, 0, size, size).data;
-						const colorBuckets = /* @__PURE__ */ new Map();
-						for (let i = 0; i < pixels.length; i += 4) {
-							if (pixels[i + 3] < 128) continue;
-							const r = pixels[i];
-							const g = pixels[i + 1];
-							const b = pixels[i + 2];
-							const brightness = (r + g + b) / 3;
-							if (brightness < 25 || brightness > 235) continue;
-							const q = (v) => Math.min(255, Math.round(v / 24) * 24);
-							const key = `${q(r)},${q(g)},${q(b)}`;
-							colorBuckets.set(key, (colorBuckets.get(key) || 0) + 1);
-						}
-						let dominantColor = null;
-						let dominantCount = 0;
-						colorBuckets.forEach((count, color) => {
-							if (count > dominantCount) {
-								dominantColor = color;
-								dominantCount = count;
-							}
-						});
-						if (!dominantColor) {
-							resolve(null);
-							return;
-						}
-						const [r, g, b] = dominantColor.split(",").map(Number);
-						resolve(BasifyTrack.rgbToHex(r, g, b));
-					} catch (e) {
-						resolve(null);
-					}
-				};
-				image.onerror = () => resolve(null);
-			});
-		}
-		static rgbToHex(r, g, b) {
-			return `#${[
-				r,
-				g,
-				b
-			].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("")}`;
-		}
-		static normalizeDistributorName(v) {
-			return String(v).toLowerCase().replace(/[©℗]/gu, "").replace(/\b\d{4}\b/gu, "").replace(/[^\p{L}\p{N}]+/gu, " ").replace(/\s+/gu, " ").trim();
-		}
-	};
-	//#endregion
-	//#region src/ui/NowPlayingArtist.js
-	var NowPlayingArtistRenderer = class NowPlayingArtistRenderer {
-		static styleElementId = "basify-now-playing-artist-style";
-		static labelPriority = [
-			"blocked",
-			"warning",
-			"unknown",
-			"pride",
-			"base",
-			"approved",
-			"noInfo"
-		];
-		static statusStyles = {
-			blocked: {
-				color: "#ff4d4d",
-				shape: "square"
-			},
-			warning: {
-				color: "#f5c542",
-				shape: "triangle"
-			},
-			approved: {
-				color: "#1ed760",
-				shape: "circle"
-			},
-			pride: {
-				color: "#4aa3df",
-				shape: "crown"
-			},
-			base: {
-				color: "#8f6cff",
-				shape: "star"
-			},
-			unknown: {
-				color: "#b3b3b3",
-				shape: "world"
-			},
-			noInfo: {
-				color: "#8a8a8a",
-				shape: "world"
-			}
-		};
-		static statusIcons = {
-			crown: crownSvg,
-			star: starSvg,
-			world: unknownSvg
-		};
-		static render(basifyTrack, artistSpans) {
-			const settings = LocalStorageManager.getSettings();
-			NowPlayingArtistRenderer.injectStyles();
-			NowPlayingArtistRenderer.renderArtistSpanGroup(artistSpans.bottomBarArtistSpans, basifyTrack.artists, settings);
-			NowPlayingArtistRenderer.renderArtistSpanGroup(artistSpans.sideViewArtistSpans, basifyTrack.artists, settings);
-		}
-		static renderArtistSpanGroup(artistSpansById, artists, settings) {
-			Object.entries(artistSpansById).forEach(([artistId, artistSpan]) => {
-				const artist = artists.find((trackArtist) => trackArtist.id === artistId);
-				NowPlayingArtistRenderer.resetArtistSpan(artistSpan);
-				if (!artist) return;
-				const dominantLabel = NowPlayingArtistRenderer.getDominantArtistLabel(artist);
-				const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
-				const artistLink = artistSpan.querySelector("a") || artistSpan;
-				if (settings.formatNowPlayingArtistName && statusStyle?.color) {
-					artistLink.classList.add("basify-now-playing-artist-name");
-					artistLink.style.setProperty("--basify-artist-status-color", statusStyle.color);
-				}
-				if (settings.showNowPlayingArtistStatusShape && statusStyle) artistSpan.appendChild(NowPlayingArtistRenderer.createStatusShape(dominantLabel));
-				if (settings.showNowPlayingArtistFlags && artist.countries.length) artist.countries.forEach((country) => {
-					const flagElement = country.flagImg(settings.emojiFlags, 4, 12, 16);
-					flagElement.classList.add("basify-artist-flag");
-					artistSpan.appendChild(flagElement);
-				});
-			});
-		}
-		static resetArtistSpan(artistSpan) {
-			artistSpan.querySelectorAll(".basify-artist-flag").forEach((flag) => flag.remove());
-			artistSpan.querySelectorAll(".basify-artist-status-shape").forEach((shape) => shape.remove());
-			const artistLink = artistSpan.querySelector("a") || artistSpan;
-			artistLink.classList.remove("basify-now-playing-artist-name");
-			artistLink.style.removeProperty("--basify-artist-status-color");
-		}
-		static getDominantArtistLabel(artist) {
-			const labels = artist.labels.length ? artist.labels : ["noInfo"];
-			return NowPlayingArtistRenderer.labelPriority.find((label) => labels.includes(label)) || "noInfo";
-		}
-		static createStatusShape(label) {
-			const statusStyle = NowPlayingArtistRenderer.statusStyles[label] || NowPlayingArtistRenderer.statusStyles.noInfo;
-			const shape = document.createElement("span");
-			shape.classList.add("basify-artist-status-shape");
-			shape.dataset.status = label;
-			shape.dataset.shape = statusStyle.shape;
-			shape.style.setProperty("--basify-artist-status-color", statusStyle.color);
-			const iconSvg = NowPlayingArtistRenderer.statusIcons[statusStyle.shape];
-			if (iconSvg) shape.innerHTML = iconSvg;
-			return shape;
-		}
-		static injectStyles() {
-			if (document.getElementById(NowPlayingArtistRenderer.styleElementId)) return;
-			const style = document.createElement("style");
-			style.id = NowPlayingArtistRenderer.styleElementId;
-			style.textContent = `
-      .basify-now-playing-artist-name { color: var(--basify-artist-status-color) !important; }
-      .basify-artist-flag { margin-bottom: 2px; }
-      .basify-artist-status-shape { display: inline-block; margin-left: 4px; vertical-align: middle; flex: 0 0 auto; }
-      .basify-artist-status-shape[data-shape="square"] { width: 10px; height: 10px; border-radius: 2px; background: var(--basify-artist-status-color); }
-      .basify-artist-status-shape[data-shape="circle"] { width: 10px; height: 10px; border-radius: 50%; background: var(--basify-artist-status-color); margin-bottom: 3px; }
-      .basify-artist-status-shape[data-shape="triangle"] { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid var(--basify-artist-status-color); margin-bottom: 4px; }
-      .basify-artist-status-shape[data-shape="crown"], .basify-artist-status-shape[data-shape="star"], .basify-artist-status-shape[data-shape="world"] { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; color: var(--basify-artist-status-color); margin-bottom: 2px; }
-      .basify-artist-status-shape[data-shape="crown"] svg, .basify-artist-status-shape[data-shape="star"] svg, .basify-artist-status-shape[data-shape="world"] svg { width: 14px; height: 14px; margin-left: 0 !important; }
-    `;
-			document.head.appendChild(style);
-		}
-	};
-	//#endregion
 	//#region src/ui/ArtistHeader.js
 	var ArtistPageHeaderRenderer = class ArtistPageHeaderRenderer {
 		static styleElementId = "basify-artist-page-header-style";
@@ -2048,546 +2713,6 @@ var Basify = (function(exports) {
       .basify-artist-name-link { display: inline-block !important; width: fit-content !important; max-width: 100% !important; cursor: pointer; color: transparent !important; -webkit-text-fill-color: transparent; background-image: radial-gradient( ellipse at center, var(--spice-button, #1ed760) 0%, color-mix( in srgb, var(--spice-button, #1ed760) 95%, transparent ) 30%, color-mix( in srgb, var(--spice-button, #1ed760) 70%, transparent ) 52%, color-mix( in srgb, var(--spice-button, #1ed760) 35%, transparent ) 72%, transparent 100% ), linear-gradient( var(--spice-text, #ffffff), var(--spice-text, #ffffff) ); background-repeat: no-repeat; background-position: center center; background-size: 0% 0%, 100% 100%; background-clip: text; -webkit-background-clip: text; text-shadow: 0 0 0 transparent; transition: background-size 0.42s cubic-bezier(0.4, 0, 1, 1), text-shadow 0.42s ease; }
       .basify-artist-name-link * { color: inherit !important; -webkit-text-fill-color: inherit !important; cursor: pointer; }
       .basify-artist-name-link:hover { background-size: 220% 500%, 100% 100%; text-shadow: 0 0 8px color-mix( in srgb, var(--spice-button, #1ed760) 32%, transparent ), 0 0 18px color-mix( in srgb, var(--spice-button, #1ed760) 16%, transparent ); transition: background-size 0.75s cubic-bezier(0.16, 1, 0.3, 1), text-shadow 0.75s cubic-bezier(0.16, 1, 0.3, 1); }
-    `;
-			document.head.appendChild(style);
-		}
-	};
-	//#endregion
-	//#region src/models/Playlist.js
-	var Playlist = class Playlist {
-		constructor(data) {
-			this.id = data.id;
-			this.name = data.name || null;
-			this.rating = data.rating || null;
-			this.trackIds = data.trackIds || [];
-			this.updatedAt = data.updatedAt || Date.now();
-			this.lastUsedAt = data.lastUsedAt || Date.now();
-		}
-		static async create(playlistId, shouldContinue = () => true) {
-			const playlistUri = "spotify:playlist:" + playlistId;
-			const trackIds = await Playlist.fetchTrackIds(playlistUri, shouldContinue);
-			const cachedPlaylistData = LocalStorageManager.getPlaylist(playlistId);
-			const sameTrackIds = cachedPlaylistData && Playlist.sameTrackIds(trackIds, cachedPlaylistData.trackIds);
-			const allTracksCached = trackIds.every((id) => LocalStorageManager.getTrack(id));
-			if (sameTrackIds && allTracksCached) return new Playlist(await LocalStorageManager.markPlaylistUsed(playlistId) || cachedPlaylistData);
-			if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
-			const name = (await Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri).catch(() => null))?.name || null;
-			const fetchedPlaylistData = await Playlist.fetch(playlistId, name, shouldContinue);
-			return new Playlist(await LocalStorageManager.savePlaylist(fetchedPlaylistData));
-		}
-		static sameTrackIds(currentTrackIds, cachedTrackIds = []) {
-			if (currentTrackIds.length !== cachedTrackIds.length) return false;
-			return currentTrackIds.every((id, index) => id === cachedTrackIds[index]);
-		}
-		static async fetchPlaylistItems(playlistUri, shouldContinue = () => true) {
-			let allTracks = [];
-			let offset = 0;
-			const limit = 200;
-			let hasMore = true;
-			while (hasMore) {
-				if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
-				const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, {
-					offset,
-					limit
-				}).catch(() => null);
-				if (!contents?.items?.length) {
-					hasMore = false;
-					break;
-				}
-				allTracks = allTracks.concat(contents.items.map((item) => item.track || item));
-				offset += limit;
-				if (contents.items.length < limit) hasMore = false;
-			}
-			return allTracks.filter((track) => track?.uri);
-		}
-		static async fetchTrackIds(playlistUri, shouldContinue = () => true) {
-			return (await Playlist.fetchPlaylistItems(playlistUri, shouldContinue)).map((track) => track.uri.split(":")[2]);
-		}
-		static async fetch(playlistId, name, shouldContinue = () => true) {
-			const playlistUri = "spotify:playlist:" + playlistId;
-			const spotifyTracks = await Playlist.fetchPlaylistItems(playlistUri, shouldContinue);
-			if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
-			const uniqueArtistsById = {};
-			spotifyTracks.forEach((track) => {
-				(track.artists || []).forEach((artist) => {
-					const id = artist.uri?.split(":")?.[2];
-					if (id && !uniqueArtistsById[id]) uniqueArtistsById[id] = {
-						id,
-						name: artist.name || null
-					};
-				});
-			});
-			const artistsById = await Artist.createMany(Object.values(uniqueArtistsById));
-			const tracksById = await BasifyTrack.createMany(spotifyTracks.map((track) => ({
-				track,
-				trackArtists: (track.artists || []).map((artist) => artistsById[artist.uri?.split(":")?.[2]]).filter(Boolean)
-			})));
-			const trackIds = spotifyTracks.map((track) => track.uri.split(":")[2]);
-			let blockedCount = 0;
-			trackIds.forEach((trackId) => {
-				const basifyTrack = tracksById[trackId];
-				if (basifyTrack && basifyTrack.getSkipReasons().length > 0) blockedCount++;
-			});
-			const totalCount = trackIds.length;
-			return {
-				id: playlistId,
-				name,
-				trackIds,
-				rating: {
-					percentage: totalCount > 0 ? Math.round(blockedCount / totalCount * 100) : 0,
-					blockedCount,
-					totalCount
-				}
-			};
-		}
-	};
-	//#endregion
-	//#region src/ui/PlaylistView.js
-	var PlaylistViewRenderer = class PlaylistViewRenderer {
-		static styleElementId = "basify-playlist-view-style";
-		static observer = null;
-		static eventsRegistered = false;
-		static inFlightPlaylists = /* @__PURE__ */ new Map();
-		static currentPlaylist = null;
-		static start() {
-			PlaylistViewRenderer.injectStyles();
-			PlaylistViewRenderer.registerGlobalInterceptors();
-			if (PlaylistViewRenderer.observer) PlaylistViewRenderer.observer.disconnect();
-			PlaylistViewRenderer.observer = new MutationObserver(() => {
-				PlaylistViewRenderer.scanRows();
-			});
-			const mainView = document.querySelector(".main-view-container");
-			if (mainView) {
-				PlaylistViewRenderer.observer.observe(mainView, {
-					childList: true,
-					subtree: true
-				});
-				PlaylistViewRenderer.scanRows();
-			}
-		}
-		static stop() {
-			if (PlaylistViewRenderer.observer) {
-				PlaylistViewRenderer.observer.disconnect();
-				PlaylistViewRenderer.observer = null;
-			}
-			PlaylistViewRenderer.currentPlaylist = null;
-		}
-		static registerGlobalInterceptors() {
-			if (PlaylistViewRenderer.eventsRegistered) return;
-			PlaylistViewRenderer.eventsRegistered = true;
-			document.addEventListener("dblclick", (e) => {
-				if (!LocalStorageManager.getSettings().skipEnabled) return;
-				if (e.target.closest(".basify-blocked-row")) {
-					e.stopPropagation();
-					e.preventDefault();
-				}
-			}, true);
-			document.addEventListener("click", (e) => {
-				if (!LocalStorageManager.getSettings().skipEnabled) return;
-				if (!e.target.closest(".basify-blocked-row")) return;
-				const playButton = e.target.closest("button[aria-label*=\"Play\"], button[aria-label*=\"play\"]");
-				const indexCell = e.target.closest(".main-trackList-rowSectionIndex");
-				if (playButton || indexCell) {
-					e.stopPropagation();
-					e.preventDefault();
-				}
-			}, true);
-		}
-		static isPlaylistPageActive(playlistId) {
-			const pathParts = Spicetify.Platform.History.location.pathname.split("/");
-			return pathParts[1] === "playlist" && pathParts[2] === playlistId;
-		}
-		static apply(headerElement, playlistId) {
-			const settings = LocalStorageManager.getSettings();
-			document.getElementById("basify-playlist-rating-card")?.remove();
-			document.getElementById("basify-playlist-rating-skeleton")?.remove();
-			if (!settings.showPlaylistRating) return;
-			PlaylistViewRenderer.injectStyles();
-			PlaylistViewRenderer.renderSkeleton(headerElement);
-			let loadPromise = PlaylistViewRenderer.inFlightPlaylists.get(playlistId);
-			if (!loadPromise) {
-				loadPromise = Playlist.create(playlistId, () => PlaylistViewRenderer.isPlaylistPageActive(playlistId)).finally(() => PlaylistViewRenderer.inFlightPlaylists.delete(playlistId));
-				PlaylistViewRenderer.inFlightPlaylists.set(playlistId, loadPromise);
-			}
-			loadPromise.then((playlist) => {
-				if (!PlaylistViewRenderer.isPlaylistPageActive(playlistId)) return;
-				PlaylistViewRenderer.currentPlaylist = playlist;
-				document.getElementById("basify-playlist-rating-skeleton")?.remove();
-				PlaylistViewRenderer.renderRatingCard(headerElement, playlist);
-				document.querySelectorAll("[data-basify-processed]").forEach((el) => el.removeAttribute("data-basify-processed"));
-			}).catch(() => {
-				document.getElementById("basify-playlist-rating-skeleton")?.remove();
-			});
-		}
-		static renderSkeleton(headerElement) {
-			const skeleton = document.createElement("div");
-			skeleton.id = "basify-playlist-rating-skeleton";
-			skeleton.className = "basify-playlist-rating-skeleton";
-			skeleton.innerHTML = `
-      <div class="basify-skeleton-gauge"></div>
-      <div class="basify-skeleton-text">
-        <div class="basify-skeleton-line" style="width: 120px;"></div>
-        <div class="basify-skeleton-line" style="width: 180px;"></div>
-      </div>
-    `;
-			headerElement.appendChild(skeleton);
-			return skeleton;
-		}
-		static animateCounter(element, targetValue, durationMs = 800) {
-			const startTime = performance.now();
-			const startValue = 0;
-			function update(currentTime) {
-				const elapsedTime = currentTime - startTime;
-				if (elapsedTime >= durationMs) {
-					element.textContent = `${targetValue}%`;
-					return;
-				}
-				const progress = elapsedTime / durationMs;
-				const easeProgress = progress * (2 - progress);
-				element.textContent = `${Math.round(startValue + easeProgress * (targetValue - startValue))}%`;
-				requestAnimationFrame(update);
-			}
-			requestAnimationFrame(update);
-		}
-		static renderRatingCard(headerElement, playlist) {
-			const rating = playlist.rating;
-			if (!rating) return;
-			document.getElementById("basify-playlist-rating-card")?.remove();
-			const card = document.createElement("div");
-			card.id = "basify-playlist-rating-card";
-			card.className = "basify-playlist-rating-card";
-			const dashArray = 126;
-			const dashOffset = dashArray - rating.percentage / 100 * dashArray;
-			let strokeColor = "#1ed760";
-			if (rating.percentage > 9) strokeColor = "#f5c542";
-			if (rating.percentage > 29) strokeColor = "#ff4d4d";
-			const locale = LocalStorageManager.getSettings().locale;
-			const ratingText = locale === "uk" ? "Рейтинг безпеки" : "Safety Rating";
-			const subText = locale === "uk" ? `${rating.blockedCount} з ${rating.totalCount} треків заблоковано` : `${rating.blockedCount} of ${rating.totalCount} tracks blocked`;
-			card.innerHTML = `
-      <div class="basify-gauge-wrapper">
-        <svg viewBox="0 0 100 55" width="100" height="55">
-          <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10" stroke-linecap="round" />
-          <path class="basify-gauge-fill" d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="${strokeColor}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${dashArray}" stroke-dashoffset="${dashArray}" />
-        </svg>
-        <div class="basify-gauge-percentage">0%</div>
-      </div>
-      <div class="basify-rating-text-container">
-        <div class="basify-rating-title">${ratingText}</div>
-        <div class="basify-rating-subtext">${subText}</div>
-      </div>
-    `;
-			headerElement.appendChild(card);
-			requestAnimationFrame(() => {
-				const fillPath = card.querySelector(".basify-gauge-fill");
-				const percentageText = card.querySelector(".basify-gauge-percentage");
-				if (fillPath && percentageText) {
-					fillPath.style.strokeDashoffset = String(dashOffset);
-					PlaylistViewRenderer.animateCounter(percentageText, rating.percentage, 800);
-				}
-			});
-		}
-		static async scanRows() {
-			const rows = document.querySelectorAll("div[role=\"row\"]");
-			const settings = LocalStorageManager.getSettings();
-			const candidates = [];
-			const uniqueArtistsById = {};
-			rows.forEach((row) => {
-				const artistLinks = row.querySelectorAll("a[href^=\"/artist/\"]");
-				if (!artistLinks.length) return;
-				const artistIds = Array.from(artistLinks).map((link) => link.pathname.split("/")[2]);
-				const artistIdsString = artistIds.join(",");
-				if (row.dataset.basifyProcessed === artistIdsString) return;
-				row.dataset.basifyProcessed = artistIdsString;
-				row.classList.remove("basify-blocked-row");
-				row.querySelectorAll(".basify-playlist-status-icon-wrapper").forEach((el) => {
-					el.removeEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
-					el.removeEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
-					el.remove();
-				});
-				artistLinks.forEach((link) => {
-					link.classList.remove("basify-now-playing-artist-name");
-					link.style.removeProperty("--basify-artist-status-color");
-				});
-				artistIds.forEach((id) => {
-					if (!uniqueArtistsById[id]) uniqueArtistsById[id] = {
-						id,
-						name: null
-					};
-				});
-				candidates.push({
-					row,
-					artistLinks,
-					artistIds
-				});
-			});
-			if (!candidates.length) return;
-			let artistsById;
-			try {
-				artistsById = await Artist.createMany(Object.values(uniqueArtistsById));
-			} catch (e) {
-				candidates.forEach(({ row }) => row.removeAttribute("data-basify-processed"));
-				return;
-			}
-			const playlist = PlaylistViewRenderer.currentPlaylist;
-			const pathParts = Spicetify.Platform.History.location.pathname.split("/");
-			const trackIds = pathParts[1] === "playlist" && playlist?.id === pathParts[2] ? playlist.trackIds : null;
-			candidates.forEach(({ row, artistLinks, artistIds }) => {
-				let shouldSkipRow = false;
-				artistIds.forEach((id, index) => {
-					const artist = artistsById[id];
-					const link = artistLinks[index];
-					if (!link || !artist) return;
-					const labels = artist.labels.length ? artist.labels : ["noInfo"];
-					const dominantLabel = [
-						"blocked",
-						"warning",
-						"unknown",
-						"pride",
-						"base",
-						"approved",
-						"noInfo"
-					].find((l) => labels.includes(l)) || "noInfo";
-					const statusStyle = NowPlayingArtistRenderer.statusStyles[dominantLabel];
-					if (settings.formatNowPlayingArtistName && statusStyle?.color) {
-						link.classList.add("basify-now-playing-artist-name");
-						link.style.setProperty("--basify-artist-status-color", statusStyle.color);
-					}
-					if (dominantLabel === "blocked" || dominantLabel === "warning" || dominantLabel === "unknown") {
-						const wrapper = document.createElement("span");
-						wrapper.className = "basify-playlist-status-icon-wrapper";
-						const iconSpan = document.createElement("span");
-						iconSpan.className = "basify-playlist-status-icon";
-						iconSpan.style.color = statusStyle.color;
-						const badgeConfig = ArtistInfoSectionRenderer.badges[dominantLabel] || ArtistInfoSectionRenderer.badges.noInfo;
-						const labelText = BasifyI18n.t(badgeConfig.textKey);
-						const description = LocalStorageManager.getSettings().locale === "uk" ? artist.description : artist.descriptionEn;
-						let tooltipText = `${labelText} (${artist.name})`;
-						if (description) tooltipText += ` - ${description}`;
-						wrapper.dataset.tooltipText = tooltipText;
-						let iconSvg = unknownSvg;
-						if (dominantLabel === "blocked") iconSvg = banSvg;
-						else if (dominantLabel === "warning") iconSvg = warningSvg;
-						iconSpan.innerHTML = iconSvg;
-						const svgElement = iconSpan.querySelector("svg");
-						if (svgElement) {
-							svgElement.setAttribute("width", "12");
-							svgElement.setAttribute("height", "12");
-							svgElement.style.marginLeft = "0";
-						}
-						wrapper.appendChild(iconSpan);
-						wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
-						wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
-						link.parentNode.insertBefore(wrapper, link.nextSibling);
-					}
-					if (dominantLabel === "blocked") shouldSkipRow = true;
-				});
-				let trackBlocked = false;
-				if (trackIds) {
-					const trackIndex = Number(row.getAttribute("aria-rowindex")) - 2;
-					const trackId = trackIndex >= 0 ? trackIds[trackIndex] : null;
-					const trackData = trackId ? LocalStorageManager.getTrack(trackId) : null;
-					if (trackData) {
-						const blockedDistributors = new BasifyTrack(trackData).getBlockedDistributors();
-						if (blockedDistributors.length > 0) {
-							trackBlocked = true;
-							const lastLink = artistLinks[artistLinks.length - 1];
-							if (lastLink) {
-								const wrapper = document.createElement("span");
-								wrapper.className = "basify-playlist-status-icon-wrapper";
-								const iconSpan = document.createElement("span");
-								iconSpan.className = "basify-playlist-status-icon";
-								iconSpan.style.color = NowPlayingArtistRenderer.statusStyles["blocked"].color;
-								iconSpan.innerHTML = banSvg;
-								const svgEl = iconSpan.querySelector("svg");
-								if (svgEl) {
-									svgEl.setAttribute("width", "12");
-									svgEl.setAttribute("height", "12");
-									svgEl.style.marginLeft = "0";
-								}
-								const labelText = LocalStorageManager.getSettings().locale === "uk" ? "Заблокований дистриб'ютор" : "Blocked distributor";
-								wrapper.dataset.tooltipText = `${labelText}: ${blockedDistributors.join(", ")}`;
-								wrapper.appendChild(iconSpan);
-								wrapper.addEventListener("mouseenter", PlaylistViewRenderer.showTooltip);
-								wrapper.addEventListener("mouseleave", PlaylistViewRenderer.hideTooltip);
-								lastLink.parentNode.insertBefore(wrapper, lastLink.nextSibling);
-							}
-						}
-					}
-				}
-				if ((shouldSkipRow || trackBlocked) && settings.skipEnabled) row.classList.add("basify-blocked-row");
-			});
-		}
-		static showTooltip(event) {
-			const wrapper = event.currentTarget;
-			const text = wrapper.dataset.tooltipText;
-			if (!text) return;
-			let tooltip = document.getElementById("basify-global-tooltip");
-			if (!tooltip) {
-				tooltip = document.createElement("div");
-				tooltip.id = "basify-global-tooltip";
-				tooltip.className = "basify-global-tooltip";
-				document.body.appendChild(tooltip);
-			}
-			tooltip.textContent = text;
-			const rect = wrapper.getBoundingClientRect();
-			tooltip.style.left = `${rect.left + rect.width / 2}px`;
-			tooltip.style.top = `${rect.top - 6}px`;
-			tooltip.classList.add("is-visible");
-		}
-		static hideTooltip() {
-			const tooltip = document.getElementById("basify-global-tooltip");
-			if (tooltip) tooltip.classList.remove("is-visible");
-		}
-		static injectStyles() {
-			if (document.getElementById(PlaylistViewRenderer.styleElementId)) return;
-			const style = document.createElement("style");
-			style.id = PlaylistViewRenderer.styleElementId;
-			style.textContent = `
-      .basify-blocked-row {
-        opacity: 0.35;
-        background: rgba(114, 52, 51, 0.05) !important;
-        transition: opacity 0.2s ease;
-      }
-      .basify-blocked-row:hover {
-        opacity: 0.75;
-      }
-      .basify-playlist-status-icon-wrapper {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        vertical-align: middle;
-        margin-left: 4px;
-      }
-      .basify-playlist-status-icon svg {
-        display: block;
-      }
-      .basify-global-tooltip {
-        position: fixed;
-        transform: translate(-50%, -100%) scale(0.95);
-        background: #282828;
-        color: #ffffff;
-        padding: 6px 10px;
-        border-radius: 4px;
-        font-size: 11px;
-        font-weight: 600;
-        max-width: 320px;
-        white-space: normal;
-        line-height: 1.4;
-        text-align: center;
-        word-wrap: break-word;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        opacity: 0;
-        z-index: 999999 !important;
-        pointer-events: none;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        transition: opacity 0.1s cubic-bezier(0.4, 0, 0.2, 1), transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .basify-global-tooltip.is-visible {
-        opacity: 1;
-        transform: translate(-50%, -100%) scale(1);
-      }
-      .basify-playlist-rating-card {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        margin-top: 16px;
-        padding: 10px 16px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        width: fit-content;
-      }
-      .basify-gauge-wrapper {
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100px;
-        height: 55px;
-      }
-      .basify-gauge-fill {
-        transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .basify-gauge-percentage {
-        position: absolute;
-        bottom: 2px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 15px;
-        font-weight: 800;
-        color: #ffffff;
-      }
-      .basify-rating-text-container {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-      .basify-rating-title {
-        font-size: 12px;
-        font-weight: 800;
-        color: #ffffff;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-      }
-      .basify-playlist-rating-card .basify-rating-title {
-        color: #ffffff !important;
-      }
-      .basify-rating-subtext {
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--spice-subtext);
-      }
-      .basify-playlist-rating-skeleton {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        margin-top: 16px;
-        padding: 10px 16px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        width: fit-content;
-      }
-      .basify-skeleton-gauge {
-        width: 100px;
-        height: 55px;
-        border-radius: 8px;
-        background: linear-gradient(
-          90deg,
-          rgba(255, 255, 255, 0.06) 25%,
-          rgba(255, 255, 255, 0.12) 50%,
-          rgba(255, 255, 255, 0.06) 75%
-        );
-        background-size: 200% 100%;
-        animation: basify-skeleton-shimmer 1.4s ease infinite;
-      }
-      .basify-skeleton-text {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .basify-skeleton-line {
-        height: 12px;
-        border-radius: 4px;
-        background: linear-gradient(
-          90deg,
-          rgba(255, 255, 255, 0.06) 25%,
-          rgba(255, 255, 255, 0.12) 50%,
-          rgba(255, 255, 255, 0.06) 75%
-        );
-        background-size: 200% 100%;
-        animation: basify-skeleton-shimmer 1.4s ease infinite;
-      }
-      @keyframes basify-skeleton-shimmer {
-        0% {
-          background-position: 200% 0;
-        }
-        100% {
-          background-position: -200% 0;
-        }
-      }
     `;
 			document.head.appendChild(style);
 		}
@@ -2674,6 +2799,7 @@ var Basify = (function(exports) {
 		loadArtistPage().catch(() => {});
 		loadPlaylistPage().catch(() => {});
 		songChangeHandler().catch(() => {});
+		Artist.refreshStaleCache().catch(() => {});
 	}
 	function main() {
 		startup().catch(() => {});

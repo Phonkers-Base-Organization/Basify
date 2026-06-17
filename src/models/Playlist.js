@@ -101,22 +101,19 @@ export class Playlist {
 
     const trackIds = spotifyTracks.map((track) => track.uri.split(":")[2]);
 
-    let blockedCount = 0;
+    const trackCounts = { blocked: 0, warning: 0, unknown: 0, noInfo: 0 };
     trackIds.forEach((trackId) => {
       const basifyTrack = tracksById[trackId];
-      if (basifyTrack && basifyTrack.getSkipReasons().length > 0) {
-        blockedCount++;
-      }
+      if (!basifyTrack) return;
+      const status = basifyTrack.getTrackDominantStatus();
+      if (status in trackCounts) trackCounts[status]++;
     });
-
-    const totalCount = trackIds.length;
-    const percentage = totalCount > 0 ? Math.round((blockedCount / totalCount) * 100) : 0;
 
     return {
       id: playlistId,
       name,
       trackIds,
-      rating: { percentage, blockedCount, totalCount },
+      rating: { trackCounts, totalCount: trackIds.length },
     };
   }
 }
