@@ -47,10 +47,10 @@ export class ArtistPageHeaderRenderer {
   }
 
   static applyArtistNameLink(titleElement, artist) {
-    if (!titleElement || !artist?.name) return;
+    if (!titleElement || !artist?.id) return;
     const openArtistOnPhonkersbase = () => {
       const locale = BasifyI18n.getPhonkersbaseLocalePath();
-      const searchParams = new URLSearchParams({ search: artist.name });
+      const searchParams = new URLSearchParams({ search: artist.id });
       window.open(`https://www.phonkersbase.com/${locale}?${searchParams.toString()}`, "_blank", "noopener,noreferrer");
     };
     titleElement.classList.add("basify-artist-name-link");

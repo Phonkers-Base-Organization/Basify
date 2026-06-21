@@ -978,10 +978,76 @@ var Basify = (function(exports) {
 		}
 	};
 	//#endregion
+	//#region src/utils/network.js
+	var TIMEOUT_MS = 15e3;
+	var MAX_RETRIES = 3;
+	var RETRY_DELAY_MS = 5e3;
+	function isRateLimitError(e) {
+		return e?.status === 429 || e?.statusCode === 429 || String(e?.message).includes("429");
+	}
+	async function fetchWithRetry(url, options = {}, { timeoutMs = TIMEOUT_MS, maxRetries = MAX_RETRIES, retryDelayMs = RETRY_DELAY_MS } = {}) {
+		for (let attempt = 0;;) {
+			const controller = new AbortController();
+			const timer = setTimeout(() => controller.abort(), timeoutMs);
+			try {
+				const response = await fetch(url, {
+					...options,
+					signal: controller.signal
+				});
+				clearTimeout(timer);
+				if (response.status === 429) {
+					const waitMs = parseInt(response.headers.get("Retry-After") || "10") * 1e3;
+					console.warn(`[Basify] Rate limited, retrying in ${waitMs / 1e3}s... ${url}`);
+					await new Promise((r) => setTimeout(r, waitMs));
+					continue;
+				}
+				return response;
+			} catch (e) {
+				clearTimeout(timer);
+				if (e.name === "AbortError") {
+					attempt++;
+					if (attempt <= maxRetries) {
+						console.warn(`[Basify] Request timed out (attempt ${attempt}/${maxRetries}), retrying in ${retryDelayMs / 1e3}s... ${url}`);
+						await new Promise((r) => setTimeout(r, retryDelayMs));
+					} else {
+						console.error(`[Basify] Request timed out after ${maxRetries} retries, giving up. ${url}`);
+						throw e;
+					}
+				} else {
+					console.error(`[Basify] Request failed:`, e, url);
+					throw e;
+				}
+			}
+		}
+	}
+	async function callWithRetry(fn, { timeoutMs = TIMEOUT_MS, maxRetries = MAX_RETRIES, retryDelayMs = RETRY_DELAY_MS } = {}) {
+		for (let attempt = 0;;) try {
+			return await Promise.race([fn(), new Promise((_, reject) => setTimeout(() => reject(/* @__PURE__ */ new Error("timeout")), timeoutMs))]);
+		} catch (e) {
+			if (isRateLimitError(e)) {
+				console.warn(`[Basify] Rate limited, retrying in ${retryDelayMs / 1e3}s...`);
+				await new Promise((r) => setTimeout(r, retryDelayMs));
+			} else if (e.message === "timeout") {
+				attempt++;
+				if (attempt <= maxRetries) {
+					console.warn(`[Basify] Request timed out (attempt ${attempt}/${maxRetries}), retrying in ${retryDelayMs / 1e3}s...`);
+					await new Promise((r) => setTimeout(r, retryDelayMs));
+				} else {
+					console.error(`[Basify] Request timed out after ${maxRetries} retries, giving up.`);
+					throw e;
+				}
+			} else {
+				console.error(`[Basify] Request failed:`, e);
+				throw e;
+			}
+		}
+	}
+	//#endregion
 	//#region src/models/Artist.js
 	var Artist = class Artist {
 		static baseArtistURL = "open.spotify.com/artist/";
 		static apiURL = "https://api.phonkersbase.com/api/v1/artist/all?search=";
+		static API_BATCH_SIZE = 50;
 		static cacheMaxAgeMs = 1440 * 60 * 1e3;
 		static labelPriority = [
 			"blocked",
@@ -1017,29 +1083,46 @@ var Basify = (function(exports) {
 				if (!cachedArtistData.name && fallbackName) cachedArtistData.name = fallbackName;
 				return new Artist(await LocalStorageManager.markArtistUsed(artistId) || cachedArtistData);
 			}
-			if (cachedArtistData && Artist.isCacheStale(cachedArtistData)) console.log("Artist information from local storage is expired", artistId);
-			const fetchedArtistData = await Artist.fetch(artistId, fallbackName);
-			return new Artist(await LocalStorageManager.saveArtist(fetchedArtistData));
+			if (cachedArtistData) console.log("Artist information from local storage is expired", artistId);
+			try {
+				const fetchedArtistData = await Artist.fetch(artistId, fallbackName);
+				return new Artist(await LocalStorageManager.saveArtist(fetchedArtistData));
+			} catch (e) {
+				if (cachedArtistData) {
+					console.warn("[Basify] Fetch failed, using stale cache for", artistId);
+					return new Artist(cachedArtistData);
+				}
+				return new Artist(Artist.createFallbackArtistData(artistId, fallbackName));
+			}
+		}
+		static async createFresh(artistId, fallbackName = null) {
+			try {
+				const fetchedArtistData = await Artist.fetch(artistId, fallbackName);
+				return new Artist(await LocalStorageManager.saveArtist(fetchedArtistData));
+			} catch (e) {
+				const cachedArtistData = LocalStorageManager.getArtist(artistId);
+				if (cachedArtistData) {
+					console.warn("[Basify] Fresh fetch failed, using cached data for", artistId);
+					return new Artist(cachedArtistData);
+				}
+				return new Artist(Artist.createFallbackArtistData(artistId, fallbackName));
+			}
 		}
 		static async fetch(artistId, fallbackName = null) {
-			Artist.baseArtistURL + artistId;
 			const requestURL = Artist.apiURL + encodeURIComponent(artistId);
 			console.log("Requesting artist from db", artistId);
-			try {
-				const responseData = await fetch(requestURL, {
-					method: "GET",
-					headers: { Accept: "application/json" }
-				});
-				const artistItem = JSON.parse(await responseData.text()).items[0];
-				if (!artistItem) return Artist.createFallbackArtistData(artistId, fallbackName);
-				return Artist.fromApiArtistItem(artistItem, artistId, fallbackName);
-			} catch (e) {
-				return Artist.createFallbackArtistData(artistId, fallbackName);
-			}
+			const responseData = await fetchWithRetry(requestURL, {
+				method: "GET",
+				headers: { Accept: "application/json" }
+			});
+			const artistItem = JSON.parse(await responseData.text()).items[0];
+			if (!artistItem) return Artist.createFallbackArtistData(artistId, fallbackName);
+			return Artist.fromApiArtistItem(artistItem, artistId, fallbackName);
 		}
 		static async createMany(artistsData) {
 			const artistsById = {};
 			const missingArtists = [];
+			const staleById = {};
 			artistsData.forEach(({ id, name }) => {
 				if (!id) return;
 				const cachedArtistData = LocalStorageManager.getArtist(id);
@@ -1049,50 +1132,68 @@ var Basify = (function(exports) {
 					LocalStorageManager.markArtistUsed(id).catch(() => {});
 					return;
 				}
+				if (cachedArtistData) staleById[id] = cachedArtistData;
 				missingArtists.push({
 					id,
 					name: name || null
 				});
 			});
 			if (!missingArtists.length) return artistsById;
-			const fetchedArtistsData = await Artist.fetchMany(missingArtists);
 			const allInputIds = new Set(artistsData.map(({ id }) => id).filter(Boolean));
-			(await LocalStorageManager.saveArtist(fetchedArtistsData, allInputIds)).forEach((artistData) => {
+			let foundArtistsData = [];
+			try {
+				foundArtistsData = await Artist.fetchMany(missingArtists);
+			} catch (e) {
+				console.error("[Basify] fetchMany failed, falling back to stale cache for all missing artists.", e);
+			}
+			if (foundArtistsData.length) (await LocalStorageManager.saveArtist(foundArtistsData, allInputIds)).forEach((artistData) => {
+				artistsById[artistData.id] = new Artist(artistData);
+			});
+			const resolvedIds = new Set(Object.keys(artistsById));
+			const newFallbacks = [];
+			missingArtists.forEach(({ id, name }) => {
+				if (resolvedIds.has(id)) return;
+				if (staleById[id]) artistsById[id] = new Artist(staleById[id]);
+				else newFallbacks.push(Artist.createFallbackArtistData(id, name));
+			});
+			if (newFallbacks.length) (await LocalStorageManager.saveArtist(newFallbacks, allInputIds)).forEach((artistData) => {
 				artistsById[artistData.id] = new Artist(artistData);
 			});
 			return artistsById;
 		}
-		static async fetchMany(artistsData) {
-			const artistIds = artistsData.map((artist) => artist.id);
+		static async fetchRawBatch(artistsData) {
+			const artistIds = artistsData.map((a) => a.id);
 			const requestURL = Artist.apiURL + encodeURIComponent(artistIds.join(","));
 			console.log("[Basify] Requesting artists from db:", artistIds);
-			try {
-				const responseData = await fetch(requestURL, {
-					method: "GET",
-					headers: { Accept: "application/json" }
-				});
-				const artistItems = JSON.parse(await responseData.text()).items || [];
-				const artistsBySpotifyId = {};
-				artistItems.forEach((artistItem) => {
-					if (!artistItem.spotifyId) return;
-					artistsBySpotifyId[artistItem.spotifyId] = artistItem;
-				});
-				return artistsData.map(({ id, name }) => {
-					const artistItem = artistsBySpotifyId[id];
-					if (!artistItem) return Artist.createFallbackArtistData(id, name);
-					return Artist.fromApiArtistItem(artistItem, id, name);
-				});
+			const responseData = await fetchWithRetry(requestURL, {
+				method: "GET",
+				headers: { Accept: "application/json" }
+			});
+			const artistItems = JSON.parse(await responseData.text()).items || [];
+			const bySpotifyId = {};
+			artistItems.forEach((item) => {
+				if (item.spotifyId) bySpotifyId[item.spotifyId] = item;
+			});
+			const missing = artistsData.filter(({ id }) => !bySpotifyId[id]);
+			if (missing.length) console.log("[Basify] Artists not found in DB:", missing.map((a) => a.id));
+			return artistsData.filter(({ id }) => bySpotifyId[id]).map(({ id, name }) => Artist.fromApiArtistItem(bySpotifyId[id], id, name));
+		}
+		static async fetchMany(artistsData) {
+			const found = [];
+			for (let i = 0; i < artistsData.length; i += Artist.API_BATCH_SIZE) try {
+				const batchFound = await Artist.fetchRawBatch(artistsData.slice(i, i + Artist.API_BATCH_SIZE));
+				found.push(...batchFound);
 			} catch (e) {
-				return artistsData.map(({ id, name }) => Artist.createFallbackArtistData(id, name));
+				console.error("[Basify] Batch request failed, some artists may be missing.", e);
 			}
+			return found;
 		}
 		static fromApiArtistItem(artistItem, artistId, fallbackName = null) {
 			const spotifyId = artistItem.spotifyId || artistId;
-			const artistURL = Artist.baseArtistURL + spotifyId;
 			return {
 				id: spotifyId,
 				name: artistItem.name || fallbackName,
-				url: artistURL,
+				url: Artist.baseArtistURL + spotifyId,
 				description: artistItem.description || null,
 				descriptionEn: artistItem.descriptionEn || null,
 				countries: (artistItem.countries || []).map((countryData) => new Country(countryData.code)),
@@ -1118,8 +1219,19 @@ var Basify = (function(exports) {
 			}));
 			if (!staleArtists.length) return;
 			console.log(`[Basify] Refreshing ${staleArtists.length} stale artist(s)...`);
-			const fetchedData = await Artist.fetchMany(staleArtists);
-			await LocalStorageManager.saveArtist(fetchedData);
+			const allStaleIds = new Set(staleArtists.map((a) => a.id));
+			for (let i = 0; i < staleArtists.length; i += Artist.API_BATCH_SIZE) await Artist.fetchAndSaveBatchWithRetry(staleArtists.slice(i, i + Artist.API_BATCH_SIZE), allStaleIds);
+		}
+		static async fetchAndSaveBatchWithRetry(batch, protectedIds = /* @__PURE__ */ new Set()) {
+			try {
+				const fetchedData = await Artist.fetchRawBatch(batch);
+				const notFoundCount = batch.length - fetchedData.length;
+				if (notFoundCount) console.log(`[Basify] ${notFoundCount} artist(s) not in DB, keeping cache`);
+				if (fetchedData.length) await LocalStorageManager.saveArtist(fetchedData, protectedIds);
+				console.log(`[Basify] Batch: ${fetchedData.length}/${batch.length} artist(s) refreshed`);
+			} catch (e) {
+				console.error("[Basify] Batch refresh failed, keeping existing cache.", e);
+			}
 		}
 	};
 	//#endregion
@@ -1315,10 +1427,7 @@ var Basify = (function(exports) {
 		static async create(spotifyTrack, trackArtists = []) {
 			const trackId = spotifyTrack.uri?.split(":")?.[2] || null;
 			const cachedTrackData = trackId ? LocalStorageManager.getTrack(trackId) : null;
-			if (cachedTrackData) {
-				console.log("Loading track from local storage", trackId);
-				return new BasifyTrack(await LocalStorageManager.markTrackUsed(trackId) || cachedTrackData, trackArtists);
-			}
+			if (cachedTrackData) return new BasifyTrack(await LocalStorageManager.markTrackUsed(trackId) || cachedTrackData, trackArtists);
 			const fetchedTrackData = await BasifyTrack.fetch(spotifyTrack, trackArtists);
 			return new BasifyTrack(await LocalStorageManager.saveTrack(fetchedTrackData), trackArtists);
 		}
@@ -1339,7 +1448,6 @@ var Basify = (function(exports) {
 		}
 		static async fetch(spotifyTrack, trackArtists = []) {
 			const distributors = await BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []);
-			console.log("Requesting track info from Spotify", spotifyTrack.uri.split(":")[2]);
 			return {
 				id: spotifyTrack.uri?.split(":")?.[2] || null,
 				uri: spotifyTrack.uri,
@@ -1380,12 +1488,12 @@ var Basify = (function(exports) {
 			if (!albumUri) return [];
 			try {
 				const { getAlbum } = Spicetify.GraphQL.Definitions;
-				const album = (await Spicetify.GraphQL.Request(getAlbum, {
+				const album = (await callWithRetry(() => Spicetify.GraphQL.Request(getAlbum, {
 					uri: albumUri,
 					locale: "",
 					offset: 0,
 					limit: 50
-				}))?.data?.albumUnion;
+				})))?.data?.albumUnion;
 				const distributorTexts = [];
 				if (album?.label) distributorTexts.push(album.label);
 				(album?.copyright?.items || []).forEach((item) => {
@@ -1553,7 +1661,7 @@ var Basify = (function(exports) {
 			const allTracksCached = trackIds.every((id) => LocalStorageManager.getTrack(id));
 			if (sameTrackIds && allTracksCached) return new Playlist(await LocalStorageManager.markPlaylistUsed(playlistId) || cachedPlaylistData);
 			if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
-			const name = (await Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri).catch(() => null))?.name || null;
+			const name = (await callWithRetry(() => Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri)).catch(() => null))?.name || null;
 			const fetchedPlaylistData = await Playlist.fetch(playlistId, name, shouldContinue);
 			return new Playlist(await LocalStorageManager.savePlaylist(fetchedPlaylistData));
 		}
@@ -1568,10 +1676,10 @@ var Basify = (function(exports) {
 			let hasMore = true;
 			while (hasMore) {
 				if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
-				const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, {
+				const contents = await callWithRetry(() => Spicetify.Platform.PlaylistAPI.getContents(playlistUri, {
 					offset,
 					limit
-				}).catch(() => null);
+				})).catch(() => null);
 				if (!contents?.items?.length) {
 					hasMore = false;
 					break;
@@ -2698,10 +2806,10 @@ var Basify = (function(exports) {
 			artistHeaderElement.style.removeProperty("word-break");
 		}
 		static applyArtistNameLink(titleElement, artist) {
-			if (!titleElement || !artist?.name) return;
+			if (!titleElement || !artist?.id) return;
 			const openArtistOnPhonkersbase = () => {
 				const locale = BasifyI18n.getPhonkersbaseLocalePath();
-				const searchParams = new URLSearchParams({ search: artist.name });
+				const searchParams = new URLSearchParams({ search: artist.id });
 				window.open(`https://www.phonkersbase.com/${locale}?${searchParams.toString()}`, "_blank", "noopener,noreferrer");
 			};
 			titleElement.classList.add("basify-artist-name-link");
@@ -2734,7 +2842,7 @@ var Basify = (function(exports) {
 		const artistId = pathParts[2];
 		const targetPathname = location.pathname;
 		try {
-			const artist = await Artist.create(artistId);
+			const artist = await Artist.createFresh(artistId);
 			const artistHeaderElement = await DomObserver.waitForArtistPageHeaderElement(artistId, 5e3);
 			if (Spicetify.Platform.History.location.pathname !== targetPathname) return;
 			if (artistHeaderElement) ArtistPageHeaderRenderer.apply(artistHeaderElement, artist);

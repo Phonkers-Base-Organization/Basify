@@ -16,7 +16,7 @@ export async function loadArtistPage(location = Spicetify.Platform.History.locat
   const artistId = pathParts[2];
   const targetPathname = location.pathname;
   try {
-    const artist = await Artist.create(artistId);
+    const artist = await Artist.createFresh(artistId);
     const artistHeaderElement = await DomObserver.waitForArtistPageHeaderElement(artistId, 5000);
     if (Spicetify.Platform.History.location.pathname !== targetPathname) {
       return;

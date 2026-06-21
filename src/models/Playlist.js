@@ -1,6 +1,7 @@
 import { LocalStorageManager } from "../services/storage.js";
 import { Artist } from "./Artist.js";
 import { BasifyTrack } from "./Track.js";
+import { callWithRetry } from "../utils/network.js";
 
 export class Playlist {
   constructor(data) {
@@ -27,7 +28,7 @@ export class Playlist {
 
     if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
 
-    const metadata = await Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri).catch(() => null);
+    const metadata = await callWithRetry(() => Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri)).catch(() => null);
     const name = metadata?.name || null;
 
     const fetchedPlaylistData = await Playlist.fetch(playlistId, name, shouldContinue);
@@ -49,9 +50,9 @@ export class Playlist {
     while (hasMore) {
       if (!shouldContinue()) throw new Error("Basify: playlist load aborted");
 
-      const contents = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri, { offset, limit }).catch(
-        () => null,
-      );
+      const contents = await callWithRetry(() =>
+        Spicetify.Platform.PlaylistAPI.getContents(playlistUri, { offset, limit }),
+      ).catch(() => null);
 
       if (!contents?.items?.length) {
         hasMore = false;

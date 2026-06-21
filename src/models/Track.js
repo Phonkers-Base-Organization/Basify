@@ -3,6 +3,7 @@ import { LocalStorageManager } from "../services/storage.js";
 import { BLOCKED_DISTRIBUTORS } from "../constants/distributors.js";
 import { Artist } from "./Artist.js";
 import { DomObserver } from "../utils/domObserver.js";
+import { callWithRetry } from "../utils/network.js";
 
 export class BasifyTrack {
   constructor(data, trackArtists = []) {
@@ -31,7 +32,7 @@ export class BasifyTrack {
     const cachedTrackData = trackId ? LocalStorageManager.getTrack(trackId) : null;
 
     if (cachedTrackData) {
-      console.log("Loading track from local storage", trackId);
+      // console.log("Loading track from local storage", trackId);
       const updatedTrackData = await LocalStorageManager.markTrackUsed(trackId);
       return new BasifyTrack(updatedTrackData || cachedTrackData, trackArtists);
     }
@@ -62,7 +63,7 @@ export class BasifyTrack {
   static async fetch(spotifyTrack, trackArtists = []) {
     const distributors = await BasifyTrack.getDistributorsFromSpotifyTrack(spotifyTrack).catch(() => []);
 
-    console.log("Requesting track info from Spotify", spotifyTrack.uri.split(":")[2]);
+    // console.log("Requesting track info from Spotify", spotifyTrack.uri.split(":")[2]);
 
     return {
       id: spotifyTrack.uri?.split(":")?.[2] || null,
@@ -117,12 +118,9 @@ export class BasifyTrack {
     if (!albumUri) return [];
     try {
       const { getAlbum } = Spicetify.GraphQL.Definitions;
-      const response = await Spicetify.GraphQL.Request(getAlbum, {
-        uri: albumUri,
-        locale: "",
-        offset: 0,
-        limit: 50,
-      });
+      const response = await callWithRetry(() =>
+        Spicetify.GraphQL.Request(getAlbum, { uri: albumUri, locale: "", offset: 0, limit: 50 }),
+      );
       const album = response?.data?.albumUnion;
       const distributorTexts = [];
       if (album?.label) {
